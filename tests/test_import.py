@@ -1,2 +1,2 @@
 def test_import():
-    from codes_dashboard import main  # noqa: F401
+    from codes_dashboard.app import main  # noqa: F401
