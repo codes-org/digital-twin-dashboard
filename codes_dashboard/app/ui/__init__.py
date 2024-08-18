@@ -5,7 +5,8 @@ from trame.widgets import client, grid, html, vuetify
 from . import (
     empty, 
     parallel_coords, 
-    time_plot
+    time_plot,
+    scatter_plot
 )
 
 
@@ -30,6 +31,7 @@ def initialize(server, ross_file):
     state.setdefault("grid_layout", [])
     parallel_coords.initialize(server, ross_file)
     time_plot.initialize(server, ross_file)
+    scatter_plot.initialize(server, ross_file)
     empty.initialize(server)
 
     # Reserve the various views
@@ -50,6 +52,13 @@ def initialize(server, ross_file):
         dict(x=0, y=20, w=8, h=10, i=view_id),
     )
     state[f"grid_view_{view_id}"] = time_plot.OPTION
+
+    # Scatter plot
+    view_id = available_view_ids.pop(0)
+    state.grid_layout.append(
+        dict(x=0, y=10, w=4, h=8, i=view_id),
+    )
+    state[f"grid_view_{view_id}"] = scatter_plot.OPTION
 
     @ctrl.set("grid_add_view")
     def add_view():
