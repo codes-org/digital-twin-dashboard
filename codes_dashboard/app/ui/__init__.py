@@ -2,7 +2,7 @@ import numpy as np
 
 from trame.ui.vuetify import SinglePageLayout
 from trame.widgets import client, grid, html, vuetify
-from . import empty
+from . import empty, time_plot
 
 
 def get_next_y_from_layout(layout):
@@ -24,12 +24,20 @@ def initialize(server, ross_file):
     # Initialize all visualizations
     state.setdefault("grid_options", [])
     state.setdefault("grid_layout", [])
+    time_plot.initialize(server, ross_file)
     empty.initialize(server)
 
     # Reserve the various views
     available_view_ids = [f"{v+1}" for v in range(10)]
     for view_id in available_view_ids:
         state[f"grid_view_{view_id}"] = empty.OPTION
+
+    # Time plot
+    view_id = available_view_ids.pop(0)
+    state.grid_layout.append(
+        dict(x=0, y=20, w=8, h=10, i=view_id),
+    )
+    state[f"grid_view_{view_id}"] = time_plot.OPTION
 
     @ctrl.set("grid_add_view")
     def add_view():
