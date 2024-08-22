@@ -72,3 +72,13 @@ class ROSSFile:
 
     def close(self):
         self.f.close()
+
+
+    @property
+    def current_time_range(self):
+        return self._current_time_range
+
+
+    @current_time_range.setter
+    def current_time_range(self, time_range):
+        self._current_time_range = time_range
