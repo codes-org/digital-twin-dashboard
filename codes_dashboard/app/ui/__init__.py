@@ -26,15 +26,12 @@ def initialize(server, ross_file):
 
     state.setdefault("grid_item_dirty_key", 0)
 
-    # set up defaults for the state
-    state.selected_time_range = [0.0, ross_file.pe_engine_df["virtual_time"].max()]
 
-    @state.change("selected_time_range")
-    def selected_time_range_changed(selected_time_range, **kwargs):
-        # so I think I need to make it so you call a getter for the data frames
-        # and then these functions will set some state on the ross file so it can 
-        # return the appropriate data frame.
-        ross_file.current_time_range = selected_time_range
+    def update_views_time():
+        print("update views for time change")
+        ctrl.on_ross_time_range_changed()
+
+    ctrl.view_update = update_views_time
 
     # Initialize all visualizations
     state.setdefault("grid_options", [])

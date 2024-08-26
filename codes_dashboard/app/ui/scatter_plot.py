@@ -21,6 +21,14 @@ def initialize(server, ross_file):
     def create_line(selected_scatter_array_x, selected_scatter_array_y):
         df = ross_file.pe_engine_df
 
+        # not sure if this is the best way to handle this.
+        # this is so we can call create_line, when the time changes, but
+        # we don't have the array selection. we save it in the state so 
+        # we'll be able to access the values later when we call this
+        # on time change.
+        state.last_scatter_array_x = selected_scatter_array_x
+        state.last_scatter_array_y = selected_scatter_array_y
+
         kwargs = {
             "x": selected_scatter_array_x,
             "y": selected_scatter_array_y,
@@ -47,6 +55,11 @@ def initialize(server, ross_file):
         **kwargs
     ):
         ctrl.update_scatter_plot(create_line(selected_scatter_array_x, selected_scatter_array_y))
+
+    @ctrl.add("on_ross_time_range_changed")
+    def on_time_change():
+        print("time change")
+        ctrl.update_scatter_plot(create_line(state.last_scatter_array_x, state.last_scatter_array_y))
 
     with DivLayout(server, template_name="scatter_plot") as layout:
         layout.root.style = "height: 100%; width: 100%;"

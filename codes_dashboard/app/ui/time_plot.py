@@ -10,13 +10,9 @@ OPTION = {
     "icon": "mdi-chart-line",
 }
 
-# this plots the some PE array over either real or virtual time 
-# TODO: grab time selection and make it update other figures
-# The plan was to get the updated x-axis values from plotly, when you zoom in,
-# but seems like you can't do that with plotly python.
-# will need to either use something other than plotly, or I guess it's possible
-# to write something in javascript that can get the values
-# see https://plotly.com/javascript/zoom-events/
+# this plots the some PE array over either real or virtual time.
+# zooming in on the graph will grab x-axis values so we can update
+# other views based on the time selection
 def initialize(server, ross_file):
     state, ctrl = server.state, server.controller
 
@@ -25,6 +21,10 @@ def initialize(server, ross_file):
 
     def create_line(selected_time_array, selected_time_type_array):
         df = ross_file.pe_engine_df
+
+        # need to keep track of whether we're using real or virtual time,
+        # so we can filter the data appropriately
+        state.selected_time_type_array = selected_time_type_array
 
         kwargs = {
             "x": selected_time_type_array,
@@ -45,13 +45,30 @@ def initialize(server, ross_file):
         "selected_time_array",
         "selected_time_type_array"
     )
-    @ctrl.add("on_ross_active_state_index_changed")
     def on_cell_change(
         selected_time_array,
         selected_time_type_array,
         **kwargs
     ):
         ctrl.update_time_plot(create_line(selected_time_array, selected_time_type_array))
+
+
+    def on_layout_change(event):
+        view_changed = False
+        if "xaxis.range[0]" in event:
+            ross_file.min_time = event["xaxis.range[0]"]
+            view_changed = True
+        if "xaxis.range[1]" in event:
+            ross_file.max_time = event["xaxis.range[1]"]
+            view_changed = True
+        if view_changed:
+            ctrl.view_update()
+
+
+    def on_double_click():
+        ross_file.reset_time_range()
+        ctrl.view_update()
+
 
     with DivLayout(server, template_name="time_plot") as layout:
         layout.root.style = "height: 100%; width: 100%;"
@@ -67,10 +84,8 @@ def initialize(server, ross_file):
             display_logo=False,
             display_mode_bar=False,
             style=style,
-            # selected=(on_event, "["selected", utils.safe($event)]"),
-            # hover=(on_event, "["hover", utils.safe($event)]"),
-            # selecting=(on_event, "["selecting", $event]"),
-            # unhover=(on_event, "["unhover", $event]"),
+            relayout=(on_layout_change, "[$event]"),
+            double_click=(on_double_click, ""),
         )
         ctrl.update_time_plot = figure.update
 

@@ -46,6 +46,10 @@ def initialize(server, ross_file):
     ):
         ctrl.update_parallel_coords(create_line())
 
+    @ctrl.add("on_ross_time_range_changed")
+    def on_time_change():
+        ctrl.update_parallel_coords(create_line())
+
     with DivLayout(server, template_name="parallel_coords") as layout:
         layout.root.style = "height: 100%; width: 100%;"
 

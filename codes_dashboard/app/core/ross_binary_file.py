@@ -24,11 +24,18 @@ class ROSSFile:
         self.engine_lp_format = "@8If"
         self.engine_lp_size = struct.calcsize(self.engine_lp_format)
 
+        self._use_virtual_time = True
+
 
     def read(self):
         pe_list = []
         kp_list = []
         lp_list = []
+
+        time_var = "virtual_time"
+        if not self._use_virtual_time:
+            time_var = "real_time"
+
         while True:
             md_bytes = self.f.read(self.engine_md_size)
             if not md_bytes:
@@ -36,6 +43,7 @@ class ROSSFile:
             md_record = namedtuple("MD", "flag sample_size virtual_time real_time")
             md = md_record._make(struct.unpack(self.engine_md_format, md_bytes))
             #print(f'flag: {md[0]}, sample size: {md[1]}, virtual ts: {md[2]}, real ts: {md[3]}')
+            
             if md.sample_size == self.engine_pe_size:
                 #print("found a pe struct")
                 pe_bytes = self.f.read(self.engine_pe_size)
@@ -65,9 +73,14 @@ class ROSSFile:
                 lp_list.append(df)
             else:
                 print("ERROR: found incorrect struct size")
-        self.pe_engine_df = pd.concat(pe_list)
-        self.kp_engine_df = pd.concat(kp_list)
-        self.lp_engine_df = pd.concat(lp_list)
+        self._pe_engine_df = pd.concat(pe_list)
+        self._kp_engine_df = pd.concat(kp_list)
+        self._lp_engine_df = pd.concat(lp_list)
+        
+        self._min_time = self._pe_engine_df["virtual_time"].min()
+        self._max_time = self._pe_engine_df["virtual_time"].max()
+        print(f'min time is {self._min_time}')
+        print(f'max time is {self._max_time}')
 
 
     def close(self):
@@ -75,10 +88,43 @@ class ROSSFile:
 
 
     @property
-    def current_time_range(self):
-        return self._current_time_range
+    def max_time(self):
+        return self._max_time
 
 
-    @current_time_range.setter
-    def current_time_range(self, time_range):
-        self._current_time_range = time_range
+    @max_time.setter
+    def max_time(self, time):
+        self._max_time = time
+        print(f'max time is {self._max_time}')
+
+
+    @property
+    def min_time(self):
+        return self._min_time
+
+
+    @min_time.setter
+    def min_time(self, time):
+        self._min_time = time
+        print(f'min time is {self._min_time}')
+
+
+    @property
+    def pe_engine_df(self):
+        return self._pe_engine_df[
+            (self._pe_engine_df["virtual_time"] >= self._min_time) &
+            (self._pe_engine_df["virtual_time"] <= self._max_time)]
+
+
+    def reset_time_range(self):
+        self._min_time = self._pe_engine_df["virtual_time"].min()
+        self._max_time = self._pe_engine_df["virtual_time"].max()
+
+
+    @property
+    def use_virtual_time(self):
+        return self._use_virtual_time
+
+    @use_virtual_time.setter
+    def use_virtual_time(self, flag):
+        self._use_virtual_time = flag
