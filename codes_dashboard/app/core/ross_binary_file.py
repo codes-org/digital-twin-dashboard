@@ -25,16 +25,13 @@ class ROSSFile:
         self.engine_lp_size = struct.calcsize(self.engine_lp_format)
 
         self._use_virtual_time = True
+        self._time_variable = "virtual_time"
 
 
     def read(self):
         pe_list = []
         kp_list = []
         lp_list = []
-
-        time_var = "virtual_time"
-        if not self._use_virtual_time:
-            time_var = "real_time"
 
         while True:
             md_bytes = self.f.read(self.engine_md_size)
@@ -77,8 +74,8 @@ class ROSSFile:
         self._kp_engine_df = pd.concat(kp_list)
         self._lp_engine_df = pd.concat(lp_list)
         
-        self._min_time = self._pe_engine_df["virtual_time"].min()
-        self._max_time = self._pe_engine_df["virtual_time"].max()
+        self._min_time = self._pe_engine_df[self._time_variable].min()
+        self._max_time = self._pe_engine_df[self._time_variable].max()
         print(f'min time is {self._min_time}')
         print(f'max time is {self._max_time}')
 
@@ -111,14 +108,20 @@ class ROSSFile:
 
     @property
     def pe_engine_df(self):
+        print("pe_engine_df")
+        print(f'\tmin time is {self._min_time}')
+        print(f'\tmax time is {self._max_time}')
         return self._pe_engine_df[
-            (self._pe_engine_df["virtual_time"] >= self._min_time) &
-            (self._pe_engine_df["virtual_time"] <= self._max_time)]
+            (self._pe_engine_df[self._time_variable] >= self._min_time) &
+            (self._pe_engine_df[self._time_variable] <= self._max_time)]
 
 
     def reset_time_range(self):
-        self._min_time = self._pe_engine_df["virtual_time"].min()
-        self._max_time = self._pe_engine_df["virtual_time"].max()
+        print("resetting time range")
+        self._min_time = self._pe_engine_df[self._time_variable].min()
+        self._max_time = self._pe_engine_df[self._time_variable].max()
+        print(f'\tmin time is {self._min_time}')
+        print(f'\tmax time is {self._max_time}')
 
 
     @property
@@ -128,3 +131,8 @@ class ROSSFile:
     @use_virtual_time.setter
     def use_virtual_time(self, flag):
         self._use_virtual_time = flag
+        if self._use_virtual_time:
+            self._time_variable = "virtual_time"
+        else:
+            self._time_variable = "real_time"
+        self.reset_time_range()

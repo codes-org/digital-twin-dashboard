@@ -58,7 +58,7 @@ def initialize(server, ross_file):
 
     @ctrl.add("on_ross_time_range_changed")
     def on_time_change():
-        print("time change")
+        print("updating scatter plot for time")
         ctrl.update_scatter_plot(create_line(state.last_scatter_array_x, state.last_scatter_array_y))
 
     with DivLayout(server, template_name="scatter_plot") as layout:
