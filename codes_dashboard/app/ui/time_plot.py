@@ -20,6 +20,11 @@ def initialize(server, ross_file):
         state.grid_options.append(OPTION)
 
     def create_line(selected_time_array, selected_time_type_array):
+        if selected_time_type_array == "virtual_time":
+            ross_file.use_virtual_time = True
+        else:
+            ross_file.use_virtual_time = False
+
         df = ross_file.pe_engine_df
 
         # need to keep track of whether we're using real or virtual time,
@@ -54,6 +59,7 @@ def initialize(server, ross_file):
 
 
     def on_layout_change(event):
+        print("time plot: on_layout_change")
         view_changed = False
         if "xaxis.range[0]" in event:
             ross_file.min_time = event["xaxis.range[0]"]
@@ -66,6 +72,7 @@ def initialize(server, ross_file):
 
 
     def on_double_click():
+        print("time plot: on_double_click")
         ross_file.reset_time_range()
         ctrl.view_update()
 
