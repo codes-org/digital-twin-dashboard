@@ -29,7 +29,7 @@ def initialize(server, ross_file):
         }
         figure = px.parallel_coordinates(df, **kwargs)
 
-        figure.update_layout(margin=dict(t=0, b=0, l=0, r=0))
+        figure.update_layout(margin=dict(t=40, b=20, l=25, r=20))
         return figure
 
     #TODO: not sure how to get rid of selected_array fully without it messing up the figure. 
