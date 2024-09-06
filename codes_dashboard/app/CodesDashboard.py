@@ -72,8 +72,45 @@ class CodesDashboard:
 
     @controller.set("view_update")
     def update_views_time(self):
-        print("update views for time change")
         self.ctrl.on_ross_time_range_changed()
+
+
+    # So vera core must have just had 10 different views that were already created
+    # and you could only readd the ones you deleted. so this will need to be changed
+    # so that you can select what type of view you want to add. will need to have a 
+    # variable that changes so we can access that here, and then we can create the
+    # correct type of view
+    # will also need to have some error checking for if we have any available view ids.
+    # should we limit it to 10 views? 
+    # maybe switch to using a drawer and it will have a list of the views showing,
+    # and that's where you add views
+    # it can kinda be like a pipeline view
+    # that way there can be an assortment of settings for creating the new view, eg
+    # is it model data or sim perf data? do we want to look at a specific type of LP?
+    @controller.set("grid_add_view")
+    @change("selected_view")
+    def add_view(self, selected_view, **kwargs):
+        next_view_id = self._available_view_ids.pop()
+        # TODO: need to determine how to select the view to be added
+        print(f'adding view id {next_view_id} of type {selected_view}')
+        print(f'avail view ids: {self._available_view_ids}')
+        next_y = get_next_y_from_layout(self.state.grid_layout)
+        self.state.grid_layout.append(
+            dict(x=0, w=12, h=DEFAULT_NB_ROWS, y=next_y, i=next_view_id)
+        ) 
+        self.state.dirty("grid_layout")
+
+
+    @controller.set("grid_remove_view")
+    def remove_view(self, view_id):
+        print(f'removing view id {view_id}')
+        self._available_view_ids.append(view_id)
+        print(f'avail view ids: {self._available_view_ids}')
+        # clear out the details of the previous view
+        self.state[f"grid_view_{view_id}"] = empty.OPTION
+        self.state.grid_layout = list(
+            filter(lambda item: item.get("i") != view_id, self.state.grid_layout)
+        )
 
 
     def _build_ui(self, *args, **kwargs):
@@ -88,47 +125,40 @@ class CodesDashboard:
         empty.initialize(self.server)
 
         # Reserve the various views
-        available_view_ids = [f"{v+1}" for v in range(10)]
-        for view_id in available_view_ids:
+        self._available_view_ids = [f"{v+1}" for v in range(10)]
+        print(f'created avail view ids: {self._available_view_ids}')
+        for view_id in self._available_view_ids:
             self.state[f"grid_view_{view_id}"] = empty.OPTION
 
         # Parallel Coordinates
-        view_id = available_view_ids.pop(0)
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'parallel coords is view_id {view_id}')
         self.state.grid_layout.append(
             dict(x=0, y=0, w=8, h=10, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = parallel_coords.OPTION
 
         # Time plot
-        view_id = available_view_ids.pop(0)
+        #TODO: maybe time plot should have to stay, and there can only be 1?
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'time plot is view_id {view_id}')
         self.state.grid_layout.append(
             dict(x=0, y=20, w=8, h=10, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = time_plot.OPTION
 
         # Scatter plot
-        view_id = available_view_ids.pop(0)
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'scatter plot is view_id {view_id}')
         self.state.grid_layout.append(
             dict(x=0, y=10, w=4, h=8, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = scatter_plot.OPTION
 
-        @controller.set("grid_add_view")
-        def add_view():
-            next_view_id = available_view_ids.pop()
-            next_y = get_next_y_from_layout(self.state.grid_layout)
-            self.state.grid_layout.append(
-                dict(x=0, w=12, h=DEFAULT_NB_ROWS, y=next_y, i=next_view_id)
-            )
-            self.state.dirty("grid_layout")
-
-
-        @controller.set("grid_remove_view")
-        def remove_view(view_id):
-            available_view_ids.append(view_id)
-            self.state.grid_layout = list(
-                filter(lambda item: item.get("i") != view_id, self.state.grid_layout)
-            )
+        _available_view_types = ["scatter_plot", "parallel_coordinates"]
 
         # Setup main layout
         with SinglePageLayout(self.server) as layout:
@@ -171,8 +201,22 @@ class CodesDashboard:
                     style="max-width: 220px",
                 )
 
-            #    with vuetify.VBtn(icon=True, click=ctrl.grid_add_view):
-            #        vuetify.VIcon("mdi-plus")
+                vuetify.VSelect(
+                    v_model=("selected_view", "scatter_plot"),
+                    items=(
+                        "available_views",
+                        [
+                            dict(text=key.replace("_", " ").title(), value=key)
+                            for key in _available_view_types
+                        ],
+                    ),
+                    hide_details=True,
+                    dense=True,
+                    style="max-width: 220px",
+                )
+
+                #with vuetify.VBtn(icon=True, click=self.ctrl.grid_add_view):
+                #    vuetify.VIcon("mdi-plus")
 
             # Main content
             with layout.content:
