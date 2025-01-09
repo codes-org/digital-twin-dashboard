@@ -9,9 +9,11 @@ from .ui import (
     empty, 
     parallel_coords, 
     time_plot,
-    scatter_plot
+    scatter_plot,
+    heatmap
 )
 from .core.ross_binary_file import ROSSFile
+from .core.event_trace_file import EventFile
 
 # The user can set this via an environment variable
 DATA_PATH_ENV_NAME = "ROSS_DATA_PATH"
@@ -34,6 +36,8 @@ class CodesDashboard:
         self._args = self._app_settings()
         self._ross_file = ROSSFile(self._args.data_file)
         self._ross_file.read()
+        self._event_file = EventFile(self._args.event_data_file)
+        self._event_file.read()
 
         if self.server.hot_reload:
             self.server.controller.on_server_reload.add(self._build_ui)
@@ -44,19 +48,27 @@ class CodesDashboard:
 
     def _app_settings(self):
         data_kwargs = {
-            "help": "Data file to load",
+            "help": "Sim Engine data file to load",
             "dest": "data_file",
+        }
+
+        event_data_kwargs = {
+            "help": "Event data file to load",
+            "dest": "event_data_file",
         }
 
         default = os.getenv(DATA_PATH_ENV_NAME)
         if default is not None:
             # If the environment variable has been provided, use that for the default
             data_kwargs["default"] = default
+            event_data_kwargs["default"] = default
         else:
             # Otherwise, the CLI argument is required
             data_kwargs["required"] = True
+            event_data_kwargs["required"] = True
 
         self.server.cli.add_argument("--data", **data_kwargs)
+        self.server.cli.add_argument("--event-data", **event_data_kwargs)
         args, _ = self.server.cli.parse_known_args()
         return args
 
@@ -121,6 +133,7 @@ class CodesDashboard:
         self.state.setdefault("grid_layout", [])
         parallel_coords.initialize(self.server, self._ross_file)
         time_plot.initialize(self.server, self._ross_file)
+        heatmap.initialize(self.server, self._event_file)
         scatter_plot.initialize(self.server, self._ross_file)
         empty.initialize(self.server)
 
@@ -149,12 +162,21 @@ class CodesDashboard:
         )
         self.state[f"grid_view_{view_id}"] = time_plot.OPTION
 
+        # heatmap
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'heatmap plot is view_id {view_id}')
+        self.state.grid_layout.append(
+            dict(x=4, y=10, w=4, h=10, i=view_id),
+        )
+        self.state[f"grid_view_{view_id}"] = heatmap.OPTION
+
         # Scatter plot
         view_id = self._available_view_ids.pop(0)
         print(f'avail view ids: {self._available_view_ids}')
         print(f'scatter plot is view_id {view_id}')
         self.state.grid_layout.append(
-            dict(x=0, y=10, w=4, h=8, i=view_id),
+            dict(x=0, y=10, w=4, h=10, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = scatter_plot.OPTION
 
