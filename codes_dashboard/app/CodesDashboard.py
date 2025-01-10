@@ -10,10 +10,12 @@ from .ui import (
     parallel_coords, 
     time_plot,
     scatter_plot,
+    network_time,
     heatmap
 )
 from .core.ross_binary_file import ROSSFile
 from .core.event_trace_file import EventFile
+from .core.model_file import ModelFile
 
 # The user can set this via an environment variable
 DATA_PATH_ENV_NAME = "ROSS_DATA_PATH"
@@ -38,6 +40,8 @@ class CodesDashboard:
         self._ross_file.read()
         self._event_file = EventFile(self._args.event_data_file)
         self._event_file.read()
+        self._model_file = ModelFile(self._args.model_data_file)
+        self._model_file.read()
 
         if self.server.hot_reload:
             self.server.controller.on_server_reload.add(self._build_ui)
@@ -57,18 +61,26 @@ class CodesDashboard:
             "dest": "event_data_file",
         }
 
+        model_data_kwargs = {
+            "help": "model data file to load",
+            "dest": "model_data_file",
+        }
+
         default = os.getenv(DATA_PATH_ENV_NAME)
         if default is not None:
             # If the environment variable has been provided, use that for the default
             data_kwargs["default"] = default
             event_data_kwargs["default"] = default
+            model_data_kwargs["default"] = default
         else:
             # Otherwise, the CLI argument is required
             data_kwargs["required"] = True
             event_data_kwargs["required"] = True
+            model_data_kwargs["required"] = True
 
         self.server.cli.add_argument("--data", **data_kwargs)
         self.server.cli.add_argument("--event-data", **event_data_kwargs)
+        self.server.cli.add_argument("--model-data", **model_data_kwargs)
         args, _ = self.server.cli.parse_known_args()
         return args
 
@@ -133,6 +145,7 @@ class CodesDashboard:
         self.state.setdefault("grid_layout", [])
         parallel_coords.initialize(self.server, self._ross_file)
         time_plot.initialize(self.server, self._ross_file)
+        network_time.initialize(self.server, self._model_file)
         heatmap.initialize(self.server, self._event_file)
         scatter_plot.initialize(self.server, self._ross_file)
         empty.initialize(self.server)
@@ -161,6 +174,15 @@ class CodesDashboard:
             dict(x=0, y=20, w=8, h=10, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = time_plot.OPTION
+
+        # network time plot
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'network time plot is view_id {view_id}')
+        self.state.grid_layout.append(
+            dict(x=0, y=30, w=8, h=10, i=view_id),
+        )
+        self.state[f"grid_view_{view_id}"] = network_time.OPTION
 
         # heatmap
         view_id = self._available_view_ids.pop(0)

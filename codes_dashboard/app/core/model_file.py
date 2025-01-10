@@ -7,12 +7,11 @@ import pandas as pd
 class ModelFile:
     def __init__(self, filename):
         self.f = open(filename, "rb")
-        #self.read_file()
-        self.md_format = "@Q2L2d2i"
+        self.md_format = "@QLLddii"
         self.md_sz = struct.calcsize(self.md_format)
 
         # TODO: will need to figure out a way to not hardcode this
-        self.simplep2p_format = "@Q2ld2ld"
+        self.simplep2p_format = "@Qlldlld"
         self.simplep2p_size = struct.calcsize(self.simplep2p_format)
 
         self._use_virtual_time = True
@@ -28,7 +27,8 @@ class ModelFile:
             md_record = namedtuple("MD", "lp_id kp_id pe_id virtual_time real_time sample_size flag")
             md = md_record._make(struct.unpack(self.md_format, md_bytes))
 
-            if md.sample_size == self.simplep2p_size:
+            # flag == 3 is model data
+            if md.flag == 3 and md.sample_size == self.simplep2p_size:
                 sp_bytes = self.f.read(self.simplep2p_size)
                 sp_record = namedtuple("SimpleP2P", "component_id send_count send_bytes send_time receive_count receive_bytes receive_time")
                 sp_data = sp_record._make(struct.unpack(self.simplep2p_format, sp_bytes))
@@ -49,13 +49,6 @@ class ModelFile:
     def close(self):
         self.f.close()
 
-    #def read_file(self):
-    #    self._df = pd.read_csv(self.filename, header=None, names=["LP ID", "Virtual Time", "Packets Sent", "Packets Received", "Bytes Sent", "Bytes Received"])
-
-    #    self._min_time = self._df["Virtual Time"].min()
-    #    self._max_time = self._df["Virtual Time"].max()
-    #    print(f'min time is {self._min_time}')
-    #    print(f'max time is {self._max_time}')
 
     @property
     def max_time(self):
