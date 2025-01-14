@@ -4,13 +4,20 @@ from collections import namedtuple
 import numpy as np 
 import pandas as pd
 
+from trame.app.file_upload import ClientFile
+
 # class inefficiently reads in and stores data in a pandas dataframe
 # matches the structs in ross/core/instrumentation/st-instrumentation.h
 # with each row in the df being an instance of the struct
 # TODO: need a way to pull in model data
 class ROSSFile:
     def __init__(self, filename):
-        self.f = open(filename, "rb")
+        print("init ROSSFile")
+        if isinstance(filename, str):
+            self.f = open(filename, "rb")
+            self.content = self.f.read()
+        elif isinstance(filename, ClientFile):
+            self.content = filename.content
 
         self.engine_md_format = "@2i2d"
         self.engine_md_size = struct.calcsize(self.engine_md_format)
@@ -33,8 +40,13 @@ class ROSSFile:
         kp_list = []
         lp_list = []
 
+        byte_pos = 0
         while True:
-            md_bytes = self.f.read(self.engine_md_size)
+            print(f'byte pos {byte_pos}')
+            print(f'file len {len(self.content)}')
+            md_bytes = self.content[byte_pos:byte_pos+self.engine_md_size]
+            byte_pos += len(md_bytes)
+            print(f'byte pos {byte_pos}')
             if not md_bytes:
                 break
             md_record = namedtuple("MD", "flag sample_size virtual_time real_time")
@@ -43,7 +55,9 @@ class ROSSFile:
             
             if md.sample_size == self.engine_pe_size:
                 #print("found a pe struct")
-                pe_bytes = self.f.read(self.engine_pe_size)
+                pe_bytes = self.content[byte_pos:byte_pos+self.engine_pe_size]
+                byte_pos += len(pe_bytes)
+                print(f'byte pos {byte_pos}')
                 pe_record = namedtuple("PE", "PE_ID events_processed events_aborted events_rolled_back total_rollbacks secondary_rollbacks fossil_collection_attempts pq_queue_size network_sends network_reads number_gvt pe_event_ties all_reduce efficiency network_read_time network_other_time gvt_time fossil_collect_time event_abort_time event_process_time pq_time rollback_time cancel_q_time avl_time buddy_time lz4_time")
                 pe_data = pe_record._make(struct.unpack(self.engine_pe_format, pe_bytes))
                 df = pd.DataFrame([pe_data])
@@ -52,7 +66,9 @@ class ROSSFile:
                 pe_list.append(df)
             elif md.sample_size == self.engine_kp_size:
                 #print("found a kp struct")
-                kp_bytes = self.f.read(self.engine_kp_size)
+                kp_bytes = self.content[byte_pos:byte_pos+self.engine_kp_size]
+                byte_pos += len(kp_bytes)
+                print(f'byte pos {byte_pos}')
                 kp_record = namedtuple("KP", "PE_ID KP_ID events_processed events_abort events_rolled_back total_rollbacks secondary_rollbacks network_sends network_reads time_ahead_gvt efficiency")
                 kp_data = kp_record._make(struct.unpack(self.engine_kp_format, kp_bytes))
                 df = pd.DataFrame([kp_data])
@@ -61,7 +77,9 @@ class ROSSFile:
                 kp_list.append(df)
             elif md.sample_size == self.engine_lp_size:
                 #print("found a lp struct")
-                lp_bytes = self.f.read(self.engine_lp_size)
+                lp_bytes = self.content[byte_pos:byte_pos+self.engine_lp_size]
+                byte_pos += len(lp_bytes)
+                print(f'byte pos {byte_pos}')
                 lp_record = namedtuple("LP", "PE_ID KP_ID LP_ID events_processed events_abort events_rolled_back network_sends network_reads efficiency")
                 lp_data = lp_record._make(struct.unpack(self.engine_lp_format, lp_bytes))
                 df = pd.DataFrame([lp_data])

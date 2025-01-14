@@ -1,9 +1,10 @@
 import os
 
 from trame.app import get_server, dev
+from trame.app.file_upload import ClientFile
 from trame.decorators import TrameApp, change, controller
-from trame.ui.vuetify import SinglePageLayout
-from trame.widgets import client, grid, html, vuetify
+from trame.ui.vuetify import SinglePageWithDrawerLayout
+from trame.widgets import client, grid, html, vuetify, trame
 
 from .ui import (
     empty, 
@@ -36,8 +37,10 @@ class CodesDashboard:
         self.server = get_server(server_or_name, client_type="vue2")
 
         self._args = self._app_settings()
-        self._ross_file = ROSSFile(self._args.data_file)
-        self._ross_file.read()
+        self._ross_file = None
+        if self._args.data_file is not None:
+            self._ross_file = ROSSFile(self._args.data_file)
+            self._ross_file.read()
         self._event_file = EventFile(self._args.event_data_file)
         self._event_file.read()
         self._model_file = ModelFile(self._args.model_data_file)
@@ -48,7 +51,8 @@ class CodesDashboard:
         self.ui = self._build_ui()
 
         # set state variables
-        self.state.trame__title = "CODES Dashboard"
+        self.state.trame__title = "NetMaestro Visualization Dashboard"
+        self.state.setdefault("active_ui", None)
 
     def _app_settings(self):
         data_kwargs = {
@@ -74,7 +78,8 @@ class CodesDashboard:
             model_data_kwargs["default"] = default
         else:
             # Otherwise, the CLI argument is required
-            data_kwargs["required"] = True
+            # so we don't want the sim engine data to be required
+            #data_kwargs["required"] = True
             event_data_kwargs["required"] = True
             model_data_kwargs["required"] = True
 
@@ -92,6 +97,18 @@ class CodesDashboard:
     @property
     def state(self):
         return self.server.state
+
+
+    @change("sim_engine_file")
+    def sim_engine_file_uploaded(self, sim_engine_file, **kwargs):
+        if sim_engine_file is None:
+            return
+        
+        file = ClientFile(sim_engine_file)
+        self._ross_file = ROSSFile(file)
+        self._ross_file.read()
+        self.create_sim_engine_figures()
+
 
 
     @controller.set("view_update")
@@ -137,25 +154,69 @@ class CodesDashboard:
         )
 
 
-    def _build_ui(self, *args, **kwargs):
-        self.state.setdefault("grid_item_dirty_key", 0)
+    def actives_change(self, ids):
+        _id = ids[0]
+        if _id == "1":
+            self.state.active_ui = "engine"
+        elif _id == "2":
+            self.state.active_ui = "model"
+        else:
+            self.state.active_ui = "nothing"
 
-        # Initialize all visualizations
-        self.state.setdefault("grid_options", [])
-        self.state.setdefault("grid_layout", [])
-        parallel_coords.initialize(self.server, self._ross_file)
-        time_plot.initialize(self.server, self._ross_file)
-        network_time.initialize(self.server, self._model_file)
-        heatmap.initialize(self.server, self._event_file)
-        scatter_plot.initialize(self.server, self._ross_file)
-        empty.initialize(self.server)
 
-        # Reserve the various views
-        self._available_view_ids = [f"{v+1}" for v in range(10)]
-        print(f'created avail view ids: {self._available_view_ids}')
-        for view_id in self._available_view_ids:
-            self.state[f"grid_view_{view_id}"] = empty.OPTION
+    def visibility_change(self, event):
+        _id = event["id"]
+        _visibility = event["visible"]
 
+        if _id == "1":
+            # engine
+            pass
+        elif _id == "2":
+            #model
+            pass
+
+
+    def vis_selection(self):
+        trame.GitTree(
+            sources=(
+                "pipeline",
+                [
+                    {"id": "1", "parent": "0", "visible": 1, "name": "Simulation Engine"},
+                    {"id": "2", "parent": "1", "visible": 1, "name": "Network Model"},
+                ],
+            ),
+            actives_change=(self.actives_change, "[$event]"),
+            visibility_change=(self.visibility_change, "[$event]"),
+        )
+
+
+    def ui_card(self, title, ui_name):
+        with vuetify.VCard(v_show=f"active_ui == '{ui_name}'"):
+            vuetify.VCardTitle(
+                title,
+                classes="grey lighten-1 py-1 grey--text text--darken-3",
+                style="user-select: none; cursor: pointer",
+                hide_details=True,
+                dense=True,
+            )
+        content = vuetify.VCardText(classes="py-2")
+        return content
+
+
+    def sim_engine_card(self):
+        with self.ui_card(title="Simulation Engine", ui_name="engine"):
+            vuetify.VFileInput(v_model=("sim_engine_file", None), label="Simulation Engine File")
+
+
+    def model_vis_card(self):
+        pass
+
+
+    def create_sim_engine_figures(self):
+        if self._ross_file is None:
+            return
+
+        print("CREATING FIGURES")
         # Parallel Coordinates
         view_id = self._available_view_ids.pop(0)
         print(f'avail view ids: {self._available_view_ids}')
@@ -165,6 +226,7 @@ class CodesDashboard:
         )
         self.state[f"grid_view_{view_id}"] = parallel_coords.OPTION
 
+        print("par coords created")
         # Time plot
         #TODO: maybe time plot should have to stay, and there can only be 1?
         view_id = self._available_view_ids.pop(0)
@@ -174,6 +236,43 @@ class CodesDashboard:
             dict(x=0, y=20, w=8, h=10, i=view_id),
         )
         self.state[f"grid_view_{view_id}"] = time_plot.OPTION
+        print("time plot created")
+
+        # Scatter plot
+        view_id = self._available_view_ids.pop(0)
+        print(f'avail view ids: {self._available_view_ids}')
+        print(f'scatter plot is view_id {view_id}')
+        self.state.grid_layout.append(
+            dict(x=0, y=10, w=4, h=10, i=view_id),
+        )
+        self.state[f"grid_view_{view_id}"] = scatter_plot.OPTION
+        print("scatter plot created")
+
+
+    def _build_ui(self, *args, **kwargs):
+        # so i think this should be pretty basic and just have the layout stuff
+        # other things should be moved so we can load with an inital set of vis (depending
+        # on what is preloaded), then we can update as files get loaded
+        self.state.setdefault("grid_item_dirty_key", 0)
+
+        # Initialize all visualizations
+        self.state.setdefault("grid_options", [])
+        self.state.setdefault("grid_layout", [])
+
+        #init the sim engine vis if data is available
+        if self._ross_file is not None:
+            parallel_coords.initialize(self.server, self._ross_file)
+            time_plot.initialize(self.server, self._ross_file)
+            scatter_plot.initialize(self.server, self._ross_file)
+        network_time.initialize(self.server, self._model_file)
+        heatmap.initialize(self.server, self._event_file)
+        empty.initialize(self.server)
+
+        # Reserve the various views
+        self._available_view_ids = [f"{v+1}" for v in range(10)]
+        print(f'created avail view ids: {self._available_view_ids}')
+        for view_id in self._available_view_ids:
+            self.state[f"grid_view_{view_id}"] = empty.OPTION
 
         # network time plot
         view_id = self._available_view_ids.pop(0)
@@ -193,19 +292,12 @@ class CodesDashboard:
         )
         self.state[f"grid_view_{view_id}"] = heatmap.OPTION
 
-        # Scatter plot
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'scatter plot is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=0, y=10, w=4, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = scatter_plot.OPTION
+        self.create_sim_engine_figures()
 
         _available_view_types = ["scatter_plot", "parallel_coordinates"]
 
         # Setup main layout
-        with SinglePageLayout(self.server) as layout:
+        with SinglePageWithDrawerLayout(self.server) as layout:
             layout.root.classes = ("{ busy: trame__busy }",)
 
             # Toolbar
@@ -231,13 +323,14 @@ class CodesDashboard:
                         width=3,
                     )
 
+                #removing this messes up the parallel coords graph for some reason
+                # but it doesn't matter that we removed the ref to the ross_file for array names
                 vuetify.VSelect(
                     v_model=("selected_array", "events_processed"),
                     items=(
                         "available_arrays",
                         [
-                            dict(text=key.replace("_", " ").title(), value=key)
-                            for key in self._ross_file.pe_engine_df.columns
+                           { "test": "test"}
                         ],
                     ),
                     hide_details=True,
@@ -245,22 +338,33 @@ class CodesDashboard:
                     style="max-width: 220px",
                 )
 
-                vuetify.VSelect(
-                    v_model=("selected_view", "scatter_plot"),
-                    items=(
-                        "available_views",
-                        [
-                            dict(text=key.replace("_", " ").title(), value=key)
-                            for key in _available_view_types
-                        ],
-                    ),
-                    hide_details=True,
-                    dense=True,
-                    style="max-width: 220px",
-                )
+                # the following code was added for adding new views, but it doesn't fully work yet,
+                # so commenting out for now
+                #vuetify.VSelect(
+                #    v_model=("selected_view", "scatter_plot"),
+                #    items=(
+                #        "available_views",
+                #        [
+                #            dict(text=key.replace("_", " ").title(), value=key)
+                #            for key in _available_view_types
+                #        ],
+                #    ),
+                #    hide_details=True,
+                #    dense=True,
+                #    style="max-width: 220px",
+                #)
 
                 #with vuetify.VBtn(icon=True, click=self.ctrl.grid_add_view):
                 #    vuetify.VIcon("mdi-plus")
+
+            # drawer components
+            with layout.drawer as drawer:
+                drawer.width = 325
+                self.vis_selection()
+                vuetify.VDivider(classes="mb-2")
+                self.sim_engine_card()
+                self.model_vis_card()
+
 
             # Main content
             with layout.content:
