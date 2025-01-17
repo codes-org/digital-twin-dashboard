@@ -19,6 +19,8 @@ def initialize(server, model_file):
         state.grid_options.append(OPTION)
 
     def create_line(selected_network_time_array, selected_network_time_type_array):
+        if not hasattr(model_file, "network_df") or model_file.network_df is None:
+            return None
         if selected_network_time_type_array == "virtual_time":
             model_file.use_virtual_time = True
         else:
@@ -56,7 +58,7 @@ def initialize(server, model_file):
 
     # TODO: will want to update the event file time too
     def on_layout_change(event):
-        print("time plot: on_layout_change")
+        print("network time plot: on_layout_change")
         view_changed = False
         if "xaxis.range[0]" in event:
             model_file.min_time = event["xaxis.range[0]"]
@@ -71,6 +73,20 @@ def initialize(server, model_file):
         print("network time plot: on_double_click")
         model_file.reset_time_range()
         ctrl.view_update()
+
+    def get_array_list():
+        if not hasattr(model_file, "network_df") or model_file.network_df is None:
+            return []
+        array_list = list(model_file.network_df.columns)
+        if "lp_id" in array_list:
+            array_list.remove("lp_id")
+        if "component_id" in array_list:
+            array_list.remove("component_id")
+        if "real_time" in array_list:
+            array_list.remove("real_time")
+        if "virtual_time" in array_list:
+            array_list.remove("virtual_time")
+        return array_list
 
     with DivLayout(server, template_name="network_time_plot") as layout:
         layout.root.style = "height: 100%; width: 100%;"
@@ -93,15 +109,7 @@ def initialize(server, model_file):
 
         with vuetify.VRow(classes="pt-2", dense=True):
             with vuetify.VCol(cols="4"):
-                array_list = list(model_file.network_df.columns)
-                if "lp_id" in array_list:
-                    array_list.remove("lp_id")
-                if "component_id" in array_list:
-                    array_list.remove("component_id")
-                if "real_time" in array_list:
-                    array_list.remove("real_time")
-                if "virtual_time" in array_list:
-                    array_list.remove("virtual_time")
+                array_list = get_array_list()
                 arrays = [
                     dict(text=key.replace("_", " ").title(), value=key)
                     for key in array_list

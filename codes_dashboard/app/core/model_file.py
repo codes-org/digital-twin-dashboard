@@ -3,10 +3,17 @@ from collections import namedtuple
 
 import pandas as pd
 
+from trame.app.file_upload import ClientFile
+
 #note this actually reads the analysis lps files, which i believe would include engine data as well, if collected
 class ModelFile:
     def __init__(self, filename):
-        self.f = open(filename, "rb")
+        if isinstance(filename, str):
+            self.f = open(filename, "rb")
+            self.content = self.f.read()
+        elif isinstance(filename, ClientFile):
+            self.content = filename.content
+
         self.md_format = "@QLLddii"
         self.md_sz = struct.calcsize(self.md_format)
 
@@ -20,8 +27,10 @@ class ModelFile:
     def read(self):
         sample_list = []
 
+        byte_pos = 0
         while True:
-            md_bytes = self.f.read(self.md_sz)
+            md_bytes = self.content[byte_pos:byte_pos+self.md_sz]
+            byte_pos += len(md_bytes)
             if not md_bytes:
                 break
             md_record = namedtuple("MD", "lp_id kp_id pe_id virtual_time real_time sample_size flag")
@@ -29,7 +38,8 @@ class ModelFile:
 
             # flag == 3 is model data
             if md.flag == 3 and md.sample_size == self.simplep2p_size:
-                sp_bytes = self.f.read(self.simplep2p_size)
+                sp_bytes = self.content[byte_pos:byte_pos+self.simplep2p_size]
+                byte_pos += len(sp_bytes)
                 sp_record = namedtuple("SimpleP2P", "component_id send_count send_bytes send_time receive_count receive_bytes receive_time")
                 sp_data = sp_record._make(struct.unpack(self.simplep2p_format, sp_bytes))
                 df = pd.DataFrame([sp_data])

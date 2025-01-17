@@ -4,9 +4,16 @@ from collections import namedtuple
 
 import pandas as pd
 
+from trame.app.file_upload import ClientFile
+
 class EventFile:
     def __init__(self, filename):
-        self.f = open(filename, "rb")
+        if isinstance(filename, str):
+            self.f = open(filename, "rb")
+            self.content = self.f.read()
+        elif isinstance(filename, ClientFile):
+            self.content = filename.content
+
         self.md_format = "@IIfffI"
         self.md_sz = struct.calcsize(self.md_format)
 
@@ -20,15 +27,18 @@ class EventFile:
     def read(self):
         sample_list = []
 
+        byte_pos = 0
         while True:
-            md_bytes = self.f.read(self.md_sz)
+            md_bytes = self.content[byte_pos: byte_pos+self.md_sz]
+            byte_pos += len(md_bytes)
             if not md_bytes:
                 break
             md_record = namedtuple("MD", "source_lp dest_lp virtual_send virtual_receive real_times sample_size")
             md = md_record._make(struct.unpack(self.md_format, md_bytes))
 
             if md.sample_size == self.simplep2p_size:
-                sp_bytes = self.f.read(self.simplep2p_size)
+                sp_bytes = self.content[byte_pos:byte_pos+self.simplep2p_size]
+                byte_pos += len(sp_bytes)
                 sp_record = namedtuple("SimpleP2P", "event_type")
                 sp_data = sp_record._make(struct.unpack(self.simplep2p_format, sp_bytes))
                 df = pd.DataFrame([sp_data])

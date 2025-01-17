@@ -38,21 +38,59 @@ class CodesDashboard:
 
         self._args = self._app_settings()
         self._ross_file = None
+        self._event_file = None
+        self._model_file = None
+
+        self.state.setdefault("grid_options", [])
+
+        self.state.sim_engine_layout = [
+                {"x:": 0, "y": 0, "w": 8, "h": 10, "i": "0"},
+                {"x:": 0, "y": 20, "w": 8, "h": 10, "i": "1"},
+                {"x:": 0, "y": 10, "w": 4, "h": 10, "i": "2"},
+        ]
+        self.state.model_layout = [
+                {"x:": 0, "y": 30, "w": 8, "h": 10, "i": 0},
+                {"x:": 4, "y": 10, "w": 4, "h": 10, "i": 1},
+        ]
+        self.state.empty_layout = []
+        self.state.dual_layout = []
+
+        self.state.current_layout = "none"
+
+        # can be none, model-only, engine-only, both
+        self.state.view_mode = "none"
         if self._args.data_file is not None:
             self._ross_file = ROSSFile(self._args.data_file)
             self._ross_file.read()
-        self._event_file = EventFile(self._args.event_data_file)
-        self._event_file.read()
-        self._model_file = ModelFile(self._args.model_data_file)
-        self._model_file.read()
+        
+        if self._args.event_data_file is not None:
+            self._event_file = EventFile(self._args.event_data_file)
+            self._event_file.read()
+
+        if self._args.model_data_file is not None:
+            self._model_file = ModelFile(self._args.model_data_file)
+            self._model_file.read()
+
+        if self._ross_file is not None and self._model_file is not None and self._event_file is not None:
+            self.state.view_mode = "both"
+            self.state.current_layout = "both"
+        elif self._ross_file is not None and self._model_file is None and self._event_file is None:
+            self.state.view_mode = "engine-only"
+            self.state.current_layout = "sim_engine"
+        elif self._ross_file is None and self._model_file is not None and self._event_file is not None:
+            self.state.view_mode = "model-only"
+            self.state.current_layout = "model"
+
+
 
         if self.server.hot_reload:
-            self.server.controller.on_server_reload.add(self._build_ui)
-        self.ui = self._build_ui()
+            self.server.controller.on_server_reload.add(self._build_ui_init)
+        self.ui = self._build_ui_init()
 
         # set state variables
         self.state.trame__title = "NetMaestro Visualization Dashboard"
         self.state.setdefault("active_ui", None)
+
 
     def _app_settings(self):
         data_kwargs = {
@@ -76,12 +114,6 @@ class CodesDashboard:
             data_kwargs["default"] = default
             event_data_kwargs["default"] = default
             model_data_kwargs["default"] = default
-        else:
-            # Otherwise, the CLI argument is required
-            # so we don't want the sim engine data to be required
-            #data_kwargs["required"] = True
-            event_data_kwargs["required"] = True
-            model_data_kwargs["required"] = True
 
         self.server.cli.add_argument("--data", **data_kwargs)
         self.server.cli.add_argument("--event-data", **event_data_kwargs)
@@ -107,8 +139,69 @@ class CodesDashboard:
         file = ClientFile(sim_engine_file)
         self._ross_file = ROSSFile(file)
         self._ross_file.read()
+
+        if self.state.view_mode == "none" or self.state.view_mode == "engine-only":
+            self.state.view_mode = "engine-only"
+        else:
+            self.state.view_mode = "both"
+
+        self._init_sim_engine_plots()
         self.create_sim_engine_figures()
 
+
+    @change("model_data_file")
+    def model_data_file_uploaded(self, model_data_file, **kwargs):
+        if model_data_file is None:
+            return
+
+        file = ClientFile(model_data_file)
+        self._model_file = ModelFile(file)
+        self._model_file.read()
+
+        if self.state.view_mode == "none" or self.state.view_mode == "model-only":
+            self.state.view_mode = "model-only"
+        else:
+            self.state.view_mode = "both"
+
+        network_time.initialize(self.server, self._model_file)
+        #view_id = self._available_view_ids.pop(0)
+        #print(f'avail view ids: {self._available_view_ids}')
+        #print(f'network time plot is view_id {view_id}')
+        #self.state.grid_layout.append(
+        #    dict(x=0, y=30, w=8, h=10, i=view_id),
+        #)
+        #self.state[f"grid_view_{view_id}"] = network_time.OPTION
+        #self._build_ui()
+        #self.ui.flush_content()
+
+    
+    @change("event_data_file")
+    def event_data_file_uploaded(self, event_data_file, **kwargs):
+        if event_data_file is None:
+            return
+
+        file = ClientFile(event_data_file)
+        self._event_file = EventFile(file)
+        self._event_file.read()
+
+
+        if self.state.view_mode == "none" or self.state.view_mode == "model-only":
+            self.state.view_mode = "model-only"
+        else:
+            self.state.view_mode = "both"
+
+        #self.state.event_file_uploaded = True
+
+        heatmap.initialize(self.server, self._event_file)
+        #view_id = self._available_view_ids.pop(0)
+        #print(f'avail view ids: {self._available_view_ids}')
+        #print(f'heatmap plot is view_id {view_id}')
+        #self.state.grid_layout.append(
+        #    dict(x=4, y=10, w=4, h=10, i=view_id),
+        #)
+        #self.state[f"grid_view_{view_id}"] = heatmap.OPTION
+        #self._build_ui()
+        self.ui.flush_content()
 
 
     @controller.set("view_update")
@@ -128,18 +221,18 @@ class CodesDashboard:
     # it can kinda be like a pipeline view
     # that way there can be an assortment of settings for creating the new view, eg
     # is it model data or sim perf data? do we want to look at a specific type of LP?
-    @controller.set("grid_add_view")
-    @change("selected_view")
-    def add_view(self, selected_view, **kwargs):
-        next_view_id = self._available_view_ids.pop()
-        # TODO: need to determine how to select the view to be added
-        print(f'adding view id {next_view_id} of type {selected_view}')
-        print(f'avail view ids: {self._available_view_ids}')
-        next_y = get_next_y_from_layout(self.state.grid_layout)
-        self.state.grid_layout.append(
-            dict(x=0, w=12, h=DEFAULT_NB_ROWS, y=next_y, i=next_view_id)
-        ) 
-        self.state.dirty("grid_layout")
+    #@controller.set("grid_add_view")
+    #@change("selected_view")
+    #def add_view(self, selected_view, **kwargs):
+    #    next_view_id = self._available_view_ids.pop()
+    #    # TODO: need to determine how to select the view to be added
+    #    print(f'adding view id {next_view_id} of type {selected_view}')
+    #    print(f'avail view ids: {self._available_view_ids}')
+    #    next_y = get_next_y_from_layout(self.state.grid_layout)
+    #    self.state.grid_layout.append(
+    #        dict(x=0, w=12, h=DEFAULT_NB_ROWS, y=next_y, i=next_view_id)
+    #    ) 
+    #    self.state.dirty("grid_layout")
 
 
     @controller.set("grid_remove_view")
@@ -209,7 +302,9 @@ class CodesDashboard:
 
 
     def model_vis_card(self):
-        pass
+        with self.ui_card(title="Network Model", ui_name="model"):
+            vuetify.VFileInput(v_model=("model_data_file", None), label="Model Data File")
+            vuetify.VFileInput(v_model=("event_data_file", None), label="Event Data File")
 
 
     def create_sim_engine_figures(self):
@@ -249,31 +344,32 @@ class CodesDashboard:
         print("scatter plot created")
 
 
-    def _build_ui(self, *args, **kwargs):
-        # so i think this should be pretty basic and just have the layout stuff
-        # other things should be moved so we can load with an inital set of vis (depending
-        # on what is preloaded), then we can update as files get loaded
-        self.state.setdefault("grid_item_dirty_key", 0)
+    def _init_sim_engine_plots(self):
+        if self._ross_file is None:
+            return
 
-        # Initialize all visualizations
-        self.state.setdefault("grid_options", [])
-        self.state.setdefault("grid_layout", [])
+        parallel_coords.initialize(self.server, self._ross_file)
+        time_plot.initialize(self.server, self._ross_file)
+        scatter_plot.initialize(self.server, self._ross_file)
 
-        #init the sim engine vis if data is available
-        if self._ross_file is not None:
-            parallel_coords.initialize(self.server, self._ross_file)
-            time_plot.initialize(self.server, self._ross_file)
-            scatter_plot.initialize(self.server, self._ross_file)
-        network_time.initialize(self.server, self._model_file)
-        heatmap.initialize(self.server, self._event_file)
+
+    def _init_plots(self):
         empty.initialize(self.server)
+        self._init_sim_engine_plots()
+        if self._model_file is not None:
+            network_time.initialize(self.server, self._model_file)
+        #if self._event_file is not None:
+        #heatmap.initialize(self.server, self._event_file)
 
+
+    def _reserve_views(self):
         # Reserve the various views
         self._available_view_ids = [f"{v+1}" for v in range(10)]
         print(f'created avail view ids: {self._available_view_ids}')
         for view_id in self._available_view_ids:
             self.state[f"grid_view_{view_id}"] = empty.OPTION
 
+        #if self._model_file is not None:
         # network time plot
         view_id = self._available_view_ids.pop(0)
         print(f'avail view ids: {self._available_view_ids}')
@@ -283,6 +379,7 @@ class CodesDashboard:
         )
         self.state[f"grid_view_{view_id}"] = network_time.OPTION
 
+        #if self._event_file is not None:
         # heatmap
         view_id = self._available_view_ids.pop(0)
         print(f'avail view ids: {self._available_view_ids}')
@@ -292,7 +389,30 @@ class CodesDashboard:
         )
         self.state[f"grid_view_{view_id}"] = heatmap.OPTION
 
-        self.create_sim_engine_figures()
+        #self.create_sim_engine_figures()
+
+
+    def _build_ui_init(self, *args, **kwargs):
+        print("begin _build_ui_init")
+        self.state.setdefault("grid_item_dirty_key", 0)
+
+        # Initialize all visualizations
+        self.state.setdefault("grid_layout", [])
+
+        self._init_plots()
+        self._reserve_views()
+
+        print("end _build_ui_init")
+        return self._build_ui()
+        # now maybe with self.ui.content, we can update the content?
+
+
+
+    def _build_ui(self, *args, **kwargs):
+        print("begin _build_ui")
+        # so i think this should be pretty basic and just have the layout stuff
+        # other things should be moved so we can load with an inital set of vis (depending
+        # on what is preloaded), then we can update as files get loaded
 
         _available_view_types = ["scatter_plot", "parallel_coordinates"]
 
@@ -368,15 +488,35 @@ class CodesDashboard:
 
             # Main content
             with layout.content:
+#                print(f'self.state.grid_layout : {self.state.grid_layout}')
                 layout.content.style = "overflow: auto; margin: 36px 0px 35px; padding: 0;"
                 with vuetify.VContainer(
                     fluid=True,
                     classes="pa-0 fill-height",
                     style="user-select: none;",
                 ):
+                    # welcome page when no files have been loaded
+                    with vuetify.VCard(v_if=("view_mode == 'none'"), classes = "ma-8"):
+                        vuetify.VCardText("Getting Started")
+                        vuetify.VCardText(
+                            """
+                             To get started, load a file for either simulation engine data
+                             or model level data on the left.
+                            """
+                        )
+
+                    # now we can create 3 views, sim engine only,
+                    # model data only
+                    # both together
+                    # need some way to specify for each vis type what kind it is
+                    # then the grid layout can loop through that?
+
+                    # model data vis only
                     with grid.GridLayout(
+                        v_if="view_mode == 'model-only'",
                         layout=("grid_layout", []),
                         row_height=30,
+                        #is_draggable="draggable",
                         vertical_compact=True,
                         style="width: 100%; height: 100%;",
                     ):
@@ -444,3 +584,4 @@ class CodesDashboard:
                                     client.ServerTemplate(
                                         name=("get(`grid_view_${item.i}`).name",)
                                     )
+            return layout
