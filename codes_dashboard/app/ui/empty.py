@@ -1,4 +1,5 @@
 from trame.ui.html import DivLayout
+from trame.widgets import plotly
 
 OPTION = {
     "name": "empty",
@@ -15,3 +16,27 @@ def initialize(server):
 
     with DivLayout(server, template_name="empty") as layout:
         layout.root.add_child("Some empty content...")
+    
+def create_empty_vis(server, template_name):
+    state, ctrl = server.state, server.controller
+
+    with DivLayout(server, template_name=f'{template_name}_init') as layout:
+        layout.root.style = "height: 100%; width: 100%;"
+
+        style = "; ".join(
+            [
+                "width: 100%",
+                "height: 80%",
+                "user-select: none",
+            ]
+        )
+        figure = plotly.Figure(
+            display_logo=False,
+            display_mode_bar=False,
+            style=style,
+            # selected=(on_event, "["selected", utils.safe($event)]"),
+            # hover=(on_event, "["hover", utils.safe($event)]"),
+            # selecting=(on_event, "["selecting", $event]"),
+            # unhover=(on_event, "["unhover", $event]"),
+        )
+        #ctrl[f"update_{template_name}"] = figure.update
