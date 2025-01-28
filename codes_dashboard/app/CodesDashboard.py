@@ -89,39 +89,38 @@ class CodesDashboard:
                         with vuetify.VRow(v_if="view_mode == 'none'"):
                             with vuetify.VCol(cols="12"):
                                 html.Div("No data loaded yet")
-                        with vuetify.VCard(v_if="view_mode == 'model-only'"):
-                            with vuetify.VCardTitle():
-                                with vuetify.VMenu(offset_y=True):
-                                    with vuetify.Template(
-                                        v_slot_activator="{ on, attrs }"
-                                    ):
-                                        with vuetify.VBtn(
-                                            icon=True,
-                                            small=True,
-                                            v_bind="attrs",
-                                            v_on="on",
-                                        ):
-                                            vuetify.VIcon(
-                                                "mdi-chart-box"
-                                            )
-                                        html.Div(
-                                            "Heatmap",
-                                            classes="ml-1 text-subtitle-2",
-                                        )
-                            vuetify.VDivider()
-                            layout.content.heatmap_vis = vuetify.VCardText()
-                            with layout.content.heatmap_vis:
-                                client.ServerTemplate(name="heatmap_init")
-                        #with vuetify.VRow(v_if="view_mode == 'model-only'"):
-                        #    with vuetify.VCol(cols="12"):
-                        #        client.ServerTemplate(name="heatmap")
+                        #self._create_vis_view("model_layout", layout.content)
+                        self._create_model_vis_view(layout)
+                        #with vuetify.VCard(v_if="view_mode == 'model-only'"):
+                        #    with vuetify.VCardTitle():
+                        #        with vuetify.VMenu(offset_y=True):
+                        #            with vuetify.Template(
+                        #                v_slot_activator="{ on, attrs }"
+                        #            ):
+                        #                with vuetify.VBtn(
+                        #                    icon=True,
+                        #                    small=True,
+                        #                    v_bind="attrs",
+                        #                    v_on="on",
+                        #                ):
+                        #                    vuetify.VIcon(
+                        #                        "mdi-chart-box"
+                        #                    )
+                        #                html.Div(
+                        #                    "Heatmap",
+                        #                    classes="ml-1 text-subtitle-2",
+                        #                )
+                        #    vuetify.VDivider()
+                        #    layout.content.heatmap_vis = vuetify.VCardText()
+                        #    with layout.content.heatmap_vis:
+                        #        client.ServerTemplate(name="heatmap_init")
 
         self.state.model_layout = [
             dict(x=0, y=10, w=8, h=10, i=1),
             #dict(x=4, y=10, w=4, h=10, i=2),
         ]
-        #self.state[f"grid_view_{self.state.model_layout[0]['i']}"] = network_time.OPTION
-        self.state[f"grid_view_{self.state.model_layout[0]['i']}"] = heatmap.OPTION
+        #self.state[f"model_grid_view_{self.state.model_layout[0]['i']}"] = network_time.OPTION
+        self.state[f"model_grid_view_{self.state.model_layout[0]['i']}"] = heatmap.OPTION
 
         if self.server.hot_reload:
             self.server.controller.on_server_reload.add(self._build_ui2)
@@ -341,171 +340,9 @@ class CodesDashboard:
         with layout:
             with layout.content:
                 layout.content.heatmap_vis.clear()
-                client.ServerTemplate(name="heatmap")
-                #layout.content.clear()
-                #with vuetify.VCard(height=500):
-                #    vuetify.VCardTitle("heatmap test")
-                #    vuetify.VDivider()
-                #    with vuetify.VCardText():
-                #        #style = "; ".join(
-                #        #    [
-                #        #        "width: 100%",
-                #        #        "height: 80%",
-                #        #        "user-select: none",
-                #        #    ]
-                #        #)
-                #        figure = plotly.Figure()
-                #        self.ctrl.update_heatmap = figure.update
-            print(layout.content)
-                #self.ctrl.update_heatmap = figure.update
-                #with vuetify.VContainer():
-                    #with vuetify.VCard(
-                    #    style="height: 100%;",
-                    #    key="grid_item_dirty_key",
-                    #):
-                    #    with vuetify.VCardTitle(classes="py-1 px-1"):
-                    #        with vuetify.VMenu(offset_y=True):
-                    #            with vuetify.Template(
-                    #                v_slot_activator="{ on, attrs }"
-                    #            ):
-                    #                with vuetify.VBtn(
-                    #                    icon=True,
-                    #                    small=True,
-                    #                    v_bind="attrs",
-                    #                    v_on="on",
-                    #                ):
-                    #                    vuetify.VIcon(
-                    #                        "mdi-chart-box"
-                    #                    )
-                    #                html.Div(
-                    #                    "Heatmap",
-                    #                    classes="ml-1 text-subtitle-2",
-                    #                )
-                    #            #with vuetify.VList(dense=True):
-                    #            #    with vuetify.VListItem(
-                    #            #        v_for="(option, index) in grid_options",
-                    #            #        key="index",
-                    #            #        click="""
-                    #            #            set(`grid_view_${item.i}`, option);
-                    #            #            grid_item_dirty_key++;
-                    #            #        """,
-                    #            #    ):
-                    #            #        with vuetify.VListItemIcon():
-                    #            #            vuetify.VIcon(v_text="option.icon")
-                    #            #        vuetify.VListItemTitle("{{ option.label }}")
-                    #        vuetify.VSpacer()
-                    #        with vuetify.VBtn(
-                    #            icon=True,
-                    #            x_small=True,
-                    #            click=(self.ctrl.grid_remove_view, "1"),
-                    #        ):
-                    #            vuetify.VIcon(
-                    #                "mdi-delete-forever-outline", small=True
-                    #            )
-                    #    vuetify.VDivider()
+                with layout.content.heatmap_vis:
+                    client.ServerTemplate(name="heatmap")
 
-                    #    style = "; ".join(
-                    #        [
-                    #            "position: relative",
-                    #            "height: calc(100% - 37px)",
-                    #            "overflow: auto",
-                    #        ]
-                    #    )
-                    #    with vuetify.VCardText(style=style, classes="drag_ignore"):
-                        #    with DivLayout(self.server) as vis:
-                        #        pass
-                                
-                            # Add template for value of get(`grid_view_${item.i}`)
-                            #client.ServerTemplate(
-                            #    name="heatmap"
-                            #)
-
-        # at this point call the update
-        #df = self._event_file.network_df
-        #matrix = df.groupby(['source_lp', 'dest_lp']).size().unstack(fill_value=0)
-        #fig = px.imshow(matrix)
-        #fig.update_layout(margin=dict(t=0, b=0, l=0, r=0),
-        #                    xaxis_title="Receiving LP ID",
-        #                    yaxis_title="Sending LP ID",
-        #                    coloraxis_colorbar=dict(title="Number of Messages"))
-        #self.ctrl.update_heatmap(fig)
-
-
-                # Add template for value of get(`grid_view_${item.i}`)
-                    #client.ServerTemplate(
-                    #    name="heatmap"
-                    #)
-                #with grid.GridLayout(
-                #    layout=("model_layout", []),
-                #    row_height=30,
-                #    is_draggable="draggable",
-                #    vertical_compact=True,
-                #    style="width: 100%; height: 100%;",
-                #):
-                #    with grid.GridItem(
-                #        v_for="item in model_layout",
-                #        key="item.i",
-                #        v_bind="item",
-                #        style="touch-action: none;",
-                #        drag_ignore_from=".drag_ignore",
-                #    ):
-                #        with vuetify.VCard(
-                #            style="height: 100%;",
-                #            key="grid_item_dirty_key",
-                #        ):
-                #            with vuetify.VCardTitle(classes="py-1 px-1"):
-                #                with vuetify.VMenu(offset_y=True):
-                #                    with vuetify.Template(
-                #                        v_slot_activator="{ on, attrs }"
-                #                    ):
-                #                        with vuetify.VBtn(
-                #                            icon=True,
-                #                            small=True,
-                #                            v_bind="attrs",
-                #                            v_on="on",
-                #                        ):
-                #                            vuetify.VIcon(
-                #                                v_text="get(`grid_view_${item.i}`).icon"
-                #                            )
-                #                        html.Div(
-                #                            "{{ get(`grid_view_${item.i}`).label }}",
-                #                            classes="ml-1 text-subtitle-2",
-                #                        )
-                #                    with vuetify.VList(dense=True):
-                #                        with vuetify.VListItem(
-                #                            v_for="(option, index) in grid_options",
-                #                            key="index",
-                #                            click="""
-                #                                set(`grid_view_${item.i}`, option);
-                #                                grid_item_dirty_key++;
-                #                            """,
-                #                        ):
-                #                            with vuetify.VListItemIcon():
-                #                                vuetify.VIcon(v_text="option.icon")
-                #                            vuetify.VListItemTitle("{{ option.label }}")
-                #                vuetify.VSpacer()
-                #                with vuetify.VBtn(
-                #                    icon=True,
-                #                    x_small=True,
-                #                    click=(self.ctrl.grid_remove_view, "[item.i]"),
-                #                ):
-                #                    vuetify.VIcon(
-                #                        "mdi-delete-forever-outline", small=True
-                #                    )
-                #            vuetify.VDivider()
-
-                #            style = "; ".join(
-                #                [
-                #                    "position: relative",
-                #                    "height: calc(100% - 37px)",
-                #                    "overflow: auto",
-                #                ]
-                #            )
-                #            with vuetify.VCardText(style=style, classes="drag_ignore"):
-                #                # Add template for value of get(`grid_view_${item.i}`)
-                #                client.ServerTemplate(
-                #                    name=("get(`grid_view_${item.i}`).name",)
-                #                )
 
     @controller.set("view_update")
     def update_views_time(self):
@@ -710,19 +547,72 @@ class CodesDashboard:
         # now maybe with self.ui.content, we can update the content?
 
 
-    def _create_vis_view_not_working(self, layout_name):
-        #if self.state.view_mode == "none":
-        #    pass
-        #elif self.state.view_mode == "engine-only":
-        #    pass
-        #elif self.state.view_mode == "model-only":
-        #    self.state.grid_layout = self.state.model_layout
-        #    self.state[f"grid_view_{self.state.grid_layout[0]['i']}"] = network_time.OPTION
-        #    #self.state[f"grid_view_{self.state.grid_layout['i']}"] = heatmap.OPTION
-        #elif self.state.view_mode == "both":
-        #    pass
+    def _create_model_vis_view(self, layout):
+        heatmap.init1(self.server)
+        with vuetify.VRow(v_if="view_mode == 'model-only'", rows=20):
+            with vuetify.VCol(cols="12"):
+                with vuetify.VCard(#style="height: 100%;",
+                                   key="grid_item_dirty_key",
+                                   height=400,
+                                   width=600
+                ):
+                    with vuetify.VCardTitle(classes="py-1 px-1"):
+                        with vuetify.VMenu(offset_y=True):
+                            with vuetify.Template(
+                                v_slot_activator="{ on, attrs }"
+                            ):
+                                with vuetify.VBtn(
+                                    icon=True,
+                                    small=True,
+                                    v_bind="attrs",
+                                    v_on="on",
+                                ):
+                                    vuetify.VIcon(
+                                        v_text="get(`model_grid_view_1`).icon"
+                                    )
+                                html.Div(
+                                    "{{ get(`model_grid_view_1`).label }}",
+                                    classes="ml-1 text-subtitle-2",
+                                )
+                            with vuetify.VList(dense=True):
+                                with vuetify.VListItem(
+                                    v_for="(option, index) in grid_options",
+                                    key="index",
+                                    click="""
+                                        set(`model_grid_view_1`, option);
+                                        grid_item_dirty_key++;
+                                    """,
+                                ):
+                                    with vuetify.VListItemIcon():
+                                        vuetify.VIcon(v_text="option.icon")
+                                    vuetify.VListItemTitle("{{ option.label }}")
+                        #vuetify.VSpacer()
+                        #with vuetify.VBtn(
+                        #    icon=True,
+                        #    x_small=True,
+                        #    click=(self.ctrl.grid_remove_view, "[1]"),
+                        #):
+                        #    vuetify.VIcon(
+                        #        "mdi-delete-forever-outline", small=True
+                        #    )
+                    vuetify.VDivider()
+                    style = "; ".join(
+                        [
+                            "position: relative",
+                            "height: calc(100% - 37px)",
+                            "overflow: auto",
+                        ]
+                    )
+                    layout.content.heatmap_vis = vuetify.VCardText(style=style, classes="drag_ignore")
+                    with layout.content.heatmap_vis:
+                        temp = client.ServerTemplate(name="heatmap_init")
+                        temp.figure
 
+
+    def _create_vis_view(self, layout_name, content):
+        heatmap.init1(self.server)
         with grid.GridLayout(
+            v_if="view_mode == 'model-only'",
             layout=("model_layout", []),
             #layout=(f"{layout_name}", []),
             row_height=30,
@@ -752,10 +642,10 @@ class CodesDashboard:
                                     v_on="on",
                                 ):
                                     vuetify.VIcon(
-                                        v_text="get(`grid_view_${item.i}`).icon"
+                                        v_text="get(`model_grid_view_${item.i}`).icon"
                                     )
                                 html.Div(
-                                    "{{ get(`grid_view_${item.i}`).label }}",
+                                    "{{ get(`model_grid_view_${item.i}`).label }}",
                                     classes="ml-1 text-subtitle-2",
                                 )
                             with vuetify.VList(dense=True):
@@ -763,7 +653,7 @@ class CodesDashboard:
                                     v_for="(option, index) in grid_options",
                                     key="index",
                                     click="""
-                                        set(`grid_view_${item.i}`, option);
+                                        set(`model_grid_view_${item.i}`, option);
                                         grid_item_dirty_key++;
                                     """,
                                 ):
@@ -791,23 +681,8 @@ class CodesDashboard:
                     with vuetify.VCardText(style=style, classes="drag_ignore"):
                         # Add template for value of get(`grid_view_${item.i}`)
                         client.ServerTemplate(
-                            name=("get(`grid_view_${item.i}`).name",)
+                            name=("get(`model_grid_view_${item.i}`).name",)
                         )
-
-    def _create_vis_view(self, layout_name):
-        # so the initialize calls create the templates for the views, and then the
-        # grid layout loops through and adds the ServerTemplate. So that's probably what is messed
-        # up in the way I'm trying to get things to work. 
-        # see the multi-layout example in my test dir. we can have an empty layout to start
-        # then once the files are loaded, clear out the content of the empty layouts, and 
-        # create the actual layouts with the correct views
-        with vuetify.VSheet(
-            #classes="pa-3 ma-2 overflow-hidden",
-            #align="center",
-            #style="height: 100%; width: 100%;",
-        ):
-         #   with vuetify.VCol(align_self="center", cols=4):
-            client.ServerTemplate(name=layout_name)
 
 
     def _build_ui2(self, *args, **kwargs):
@@ -823,11 +698,11 @@ class CodesDashboard:
 
         with RouterViewLayout(self.server, "/model"):
             with vuetify.VContainer():
-                self._create_vis_view("model_layout")
+                client.ServerTemplate(name="model_layout")
 
         with RouterViewLayout(self.server, "/engine"):
             with vuetify.VContainer():
-                self._create_vis_view("sim_engine_layout")
+                client.ServerTemplate(name="sim_engine_layout")
 
         with SinglePageWithDrawerLayout(self.server) as layout:
             layout.root.classes = ("{ busy: trame__busy }",)
@@ -884,12 +759,6 @@ class CodesDashboard:
                 with vuetify.VContainer(
                     style="user-select: none;",
                 ):
-                    #with vuetify.VRow():
-                    #    for key in self.LAYOUTS:
-                    #        with vuetify.VCol(align_self="center", cols=4):
-                    #            client.ServerTemplate(
-                    #                name=key, classes="pa-4"
-                    #            )
                     router.RouterView()
 
             return layout

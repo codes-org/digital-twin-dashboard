@@ -12,6 +12,9 @@ OPTION = {
 }
 
 
+def init1(server):
+    if OPTION not in server.state.grid_options:
+        server.state.grid_options.append(OPTION)
 
 # heatmap of the selected variable showing connections between the  
 # so when we don't preload data, this network_file is None and we can't do anything
@@ -110,5 +113,3 @@ def initialize(server, network_file):
                     dense=True,
                     style="max-width: 220px",
                 )
-        print("heatmap.py")
-        print(layout)

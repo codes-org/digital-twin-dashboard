@@ -1,5 +1,5 @@
 from trame.ui.html import DivLayout
-from trame.widgets import plotly
+from trame.widgets import plotly, vuetify
 
 OPTION = {
     "name": "empty",
@@ -30,13 +30,11 @@ def create_empty_vis(server, template_name):
                 "user-select: none",
             ]
         )
-        figure = plotly.Figure(
+        layout.figure = plotly.Figure(
             display_logo=False,
             display_mode_bar=False,
             style=style,
-            # selected=(on_event, "["selected", utils.safe($event)]"),
-            # hover=(on_event, "["hover", utils.safe($event)]"),
-            # selecting=(on_event, "["selecting", $event]"),
-            # unhover=(on_event, "["unhover", $event]"),
         )
-        #ctrl[f"update_{template_name}"] = figure.update
+
+        layout.options = vuetify.VRow(classes="pt-2", dense=True)
+        
