@@ -2,8 +2,9 @@ import plotly.express as px
 import numpy as np
 
 from trame.ui.html import DivLayout
-from trame.widgets import plotly, vuetify, client
+from trame.widgets import plotly, vuetify
 
+from . import empty
 
 OPTION = {
     "name": "heatmap",
@@ -11,10 +12,13 @@ OPTION = {
     "icon": "mdi-chart-box",
 }
 
+TEMPLATE_NAME = "heatmap"
 
-def init1(server):
+def init_options(server):
     if OPTION not in server.state.grid_options:
         server.state.grid_options.append(OPTION)
+
+    empty.init_empty_vis(server, TEMPLATE_NAME)
 
 # heatmap of the selected variable showing connections between the  
 # so when we don't preload data, this network_file is None and we can't do anything
@@ -23,9 +27,6 @@ def init1(server):
 # this would also let us have multiple instances of a vis so that we could have multiple heatmaps
 def initialize(server, network_file):
     state, ctrl = server.state, server.controller
-
-    if OPTION not in state.grid_options:
-        state.grid_options.append(OPTION)
 
     # lets provide the ability to color by either the count of messages or the amount of 
     # data sent. right now this is the same thing (Because all messages are the same size).
@@ -76,7 +77,7 @@ def initialize(server, network_file):
         if update_vis:
             ctrl.update_heatmap(create_heatmap(state.last_heatmap_variable))
 
-    with DivLayout(server, template_name="heatmap") as layout:
+    with DivLayout(server, template_name=TEMPLATE_NAME) as layout:
         layout.root.style = "height: 100%; width: 100%;"
 
         style = "; ".join(

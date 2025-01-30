@@ -3,6 +3,7 @@ import plotly.express as px
 from trame.ui.html import DivLayout
 from trame.widgets import plotly
 
+from . import empty
 
 OPTION = {
     "name": "parallel_coords",
@@ -10,14 +11,19 @@ OPTION = {
     "icon": "mdi-chart-line-stacked",
 }
 
+TEMPLATE_NAME = "parallel_coords"
+
+def init_options(server):
+    if OPTION not in server.state.grid_options:
+        server.state.grid_options.append(OPTION)
+
+    empty.init_empty_vis(server, TEMPLATE_NAME)
 
 def initialize(server, ross_file):
     state, ctrl = server.state, server.controller
 
-    if OPTION not in state.grid_options:
-        state.grid_options.append(OPTION)
-
     def create_line():
+        print("parcoords create_line called")
         df = ross_file.pe_engine_df
 
         kwargs = {
@@ -36,14 +42,12 @@ def initialize(server, ross_file):
     # I think because it needs some kind of event to trigger this.
     # But I think I will add some other options to the toolbar in the future that
     # could trigger a state change so just leaving for now
-    @state.change(
-        "selected_array",
-    )
-    @ctrl.add("on_ross_active_state_index_changed")
-    def on_cell_change(
-        selected_array,
-        **kwargs
-    ):
+    #@state.change(
+    #    "selected_array",
+    #)
+    @ctrl.add("init_parallel_coords")
+    def on_cell_change():
+        print("on_cell_change called")
         ctrl.update_parallel_coords(create_line())
 
     @ctrl.add("on_ross_time_range_changed")
@@ -51,7 +55,7 @@ def initialize(server, ross_file):
         print("updating par coords for time")
         ctrl.update_parallel_coords(create_line())
 
-    with DivLayout(server, template_name="parallel_coords") as layout:
+    with DivLayout(server, template_name=TEMPLATE_NAME) as layout:
         layout.root.style = "height: 100%; width: 100%;"
 
         style = "; ".join(

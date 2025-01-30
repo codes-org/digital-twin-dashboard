@@ -3,6 +3,7 @@ import plotly.express as px
 from trame.ui.html import DivLayout
 from trame.widgets import plotly, vuetify
 
+from . import empty
 
 OPTION = {
     "name": "scatter_plot",
@@ -10,6 +11,13 @@ OPTION = {
     "icon": "mdi-chart-scatter-plot",
 }
 
+TEMPLATE_NAME = "scatter_plot"
+
+def init_options(server):
+    if OPTION not in server.state.grid_options:
+        server.state.grid_options.append(OPTION)
+
+    empty.init_empty_vis(server, TEMPLATE_NAME)
 
 # scatter plot of two variables
 def initialize(server, ross_file):
@@ -61,7 +69,7 @@ def initialize(server, ross_file):
         print("updating scatter plot for time")
         ctrl.update_scatter_plot(create_line(state.last_scatter_array_x, state.last_scatter_array_y))
 
-    with DivLayout(server, template_name="scatter_plot") as layout:
+    with DivLayout(server, template_name=TEMPLATE_NAME) as layout:
         layout.root.style = "height: 100%; width: 100%;"
 
         style = "; ".join(

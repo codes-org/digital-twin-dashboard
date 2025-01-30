@@ -3,20 +3,27 @@ import plotly.express as px
 from trame.ui.html import DivLayout
 from trame.widgets import html, plotly, vuetify
 
+from . import empty
+
 OPTION = {
     "name": "network_time_plot",
     "label": "Network Time Plot",
     "icon": "mdi-chart-network",
 }
 
+TEMPLATE_NAME = "network_time_plot"
+
+def init_options(server):
+    if OPTION not in server.state.grid_options:
+        server.state.grid_options.append(OPTION)
+
+    empty.init_empty_vis(server, TEMPLATE_NAME)
+
 # This plots some PE array over network time.
 # Zooming in on the graph will grab x-axis values so we can update
 # other views based on the time selection
 def initialize(server, model_file):
     state, ctrl = server.state, server.controller
-
-    if OPTION not in state.grid_options:
-        state.grid_options.append(OPTION)
 
     def create_line(selected_network_time_array, selected_network_time_type_array):
         if not hasattr(model_file, "network_df") or model_file.network_df is None:
@@ -88,7 +95,7 @@ def initialize(server, model_file):
             array_list.remove("virtual_time")
         return array_list
 
-    with DivLayout(server, template_name="network_time_plot") as layout:
+    with DivLayout(server, template_name=TEMPLATE_NAME) as layout:
         layout.root.style = "height: 100%; width: 100%;"
 
         style = "; ".join(

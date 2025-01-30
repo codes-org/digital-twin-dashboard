@@ -3,12 +3,21 @@ import plotly.express as px
 from trame.ui.html import DivLayout
 from trame.widgets import html, plotly, vuetify
 
+from . import empty
 
 OPTION = {
     "name": "time_plot",
     "label": "Time Plot",
     "icon": "mdi-chart-line",
 }
+
+TEMPLATE_NAME = "time_plot"
+
+def init_options(server):
+    if OPTION not in server.state.grid_options:
+        server.state.grid_options.append(OPTION)
+
+    empty.init_empty_vis(server, TEMPLATE_NAME)
 
 # this plots the some PE array over either real or virtual time.
 # zooming in on the graph will grab x-axis values so we can update
@@ -77,7 +86,7 @@ def initialize(server, ross_file):
         ctrl.view_update()
 
 
-    with DivLayout(server, template_name="time_plot") as layout:
+    with DivLayout(server, template_name=TEMPLATE_NAME) as layout:
         layout.root.style = "height: 100%; width: 100%;"
 
         style = "; ".join(

@@ -39,21 +39,26 @@ def get_next_y_from_layout(layout):
 class CodesDashboard:
     def __init__(self, server_or_name=None) -> None:
         self.server = get_server(server_or_name, client_type="vue2")
+        self.state.trame__title = "Visualization Dashboard"
         self.state.setdefault("grid_options", [])
-        self.state.setdefault("grid_item_dirty_key", 0)
+        self.state.setdefault("model_grid_item_dirty_key", 0)
+        self.state.setdefault("engine_grid_item_dirty_key", 0)
 
         self._args = self._app_settings()
         self._ross_file = None
         self._event_file = None
         self._model_file = None
 
+        # only true when both event file and model file are uploaded
         self.state.all_model_data_uploaded = False
+        self.state.sim_engine_data_uploaded = False
 
         # can be none, model-only, engine-only, both
         self.state.view_mode = "none"
         if self._args.data_file is not None:
             self._ross_file = ROSSFile(self._args.data_file)
             self._ross_file.read()
+            self.state.sim_engine_data_uploaded = True
         
         if self._args.event_data_file is not None:
             self._event_file = EventFile(self._args.event_data_file)
@@ -62,6 +67,9 @@ class CodesDashboard:
         if self._args.model_data_file is not None:
             self._model_file = ModelFile(self._args.model_data_file)
             self._model_file.read()
+
+        if self._model_file is not None and self._event_file is not None:
+            self.state.all_model_data_uploaded = True
 
         # at this point, set up default layouts, which if nothing is loaded, is just
         # empty. maybe it should be an empty vcontainer or something, that we can then
@@ -72,140 +80,28 @@ class CodesDashboard:
         # but doesn't have to set up any of the other stuff, or maybe there's just a default
         # function that sets up some empty figures and hides them, then that can be adapted
         # to the correct type of figure when the data is loaded
-        self.set_up_initial_vis()
+        self.init_all_visualizations()
 
-        self.layout_names = ["model_layout"]
         self.LAYOUTS = {}
-        for name in self.layout_names:
-            layout = DivLayout(self.server, name)
-            self.LAYOUTS[name] = layout
-            with layout:
-                trame.LifeCycleMonitor(name=f"{name} layout", events=("['created']",))
-                with vuetify.VCard(width=1200, height=800):
-                    vuetify.VCardTitle(name)
-                    vuetify.VDivider()
-                    layout.content = vuetify.VCardText()
-                    with layout.content:
-                        with vuetify.VRow(v_if="view_mode == 'none'"):
-                            with vuetify.VCol(cols="12"):
-                                html.Div("No data loaded yet")
-                        #self._create_vis_view("model_layout", layout.content)
-                        self._create_model_vis_view(layout)
-                        #with vuetify.VCard(v_if="view_mode == 'model-only'"):
-                        #    with vuetify.VCardTitle():
-                        #        with vuetify.VMenu(offset_y=True):
-                        #            with vuetify.Template(
-                        #                v_slot_activator="{ on, attrs }"
-                        #            ):
-                        #                with vuetify.VBtn(
-                        #                    icon=True,
-                        #                    small=True,
-                        #                    v_bind="attrs",
-                        #                    v_on="on",
-                        #                ):
-                        #                    vuetify.VIcon(
-                        #                        "mdi-chart-box"
-                        #                    )
-                        #                html.Div(
-                        #                    "Heatmap",
-                        #                    classes="ml-1 text-subtitle-2",
-                        #                )
-                        #    vuetify.VDivider()
-                        #    layout.content.heatmap_vis = vuetify.VCardText()
-                        #    with layout.content.heatmap_vis:
-                        #        client.ServerTemplate(name="heatmap_init")
-
-        self.state.model_layout = [
-            dict(x=0, y=10, w=8, h=10, i=1),
-            #dict(x=4, y=10, w=4, h=10, i=2),
-        ]
-        #self.state[f"model_grid_view_{self.state.model_layout[0]['i']}"] = network_time.OPTION
-        self.state[f"model_grid_view_{self.state.model_layout[0]['i']}"] = heatmap.OPTION
+        self.set_up_model_vis_view()
+        self.set_up_sim_engine_vis_view()
 
         if self.server.hot_reload:
-            self.server.controller.on_server_reload.add(self._build_ui2)
-        self.ui = self._build_ui2()
+            self.server.controller.on_server_reload.add(self._build_ui)
+        self.ui = self._build_ui()
 
 
-    def set_up_initial_vis(self):
-        # TODO: create for every type of visualization
-        empty.create_empty_vis(self.server, "heatmap")
+    @property
+    def ctrl(self):
+        return self.server.controller
+    
+
+    @property
+    def state(self):
+        return self.server.state
 
 
-    def __init_old(self, server_or_name=None) -> None:
-        self.server = get_server(server_or_name, client_type="vue2")
-        self.server.debug = True
-
-        self._args = self._app_settings()
-        self._ross_file = None
-        self._event_file = None
-        self._model_file = None
-
-        self.state.setdefault("grid_options", [])
-        self.state.setdefault("grid_layout", [])
-        self.state.setdefault("grid_item_dirty_key", 0)
-
-        self._available_view_ids = [f"{v+1}" for v in range(10)]
-        print(f'created avail view ids: {self._available_view_ids}')
-        for view_id in self._available_view_ids:
-            self.state[f"grid_view_{view_id}"] = empty.OPTION
-        self.state.sim_engine_layout = [
-                {"x:": 0, "y": 0, "w": 8, "h": 10, "i": "0"},
-                {"x:": 0, "y": 20, "w": 8, "h": 10, "i": "1"},
-                {"x:": 0, "y": 10, "w": 4, "h": 10, "i": "2"},
-        ]
-        self.state.model_layout = [
-                #{"x:": 0, "y": 30, "w": 8, "h": 10, "i": 1},
-            dict(x=4, y=10, w=4, h=10, i=1),
-                #{"x:": 4, "y": 10, "w": 4, "h": 10, "i": 1},
-        ]
-        self.state[f"grid_view_{self.state.model_layout[0]['i']}"] = network_time.OPTION
-
-        if network_time.OPTION not in self.state.grid_options:
-            self.state.grid_options.append(network_time.OPTION)
-        if empty.OPTION not in self.state.grid_options:
-            self.state.grid_options.append(empty.OPTION)
-
-        self.state.empty_layout = []
-        self.state.dual_layout = []
-
-        self.state.current_layout = "none"
-
-        # can be none, model-only, engine-only, both
-        self.state.view_mode = "none"
-        if self._args.data_file is not None:
-            self._ross_file = ROSSFile(self._args.data_file)
-            self._ross_file.read()
-        
-        if self._args.event_data_file is not None:
-            self._event_file = EventFile(self._args.event_data_file)
-            self._event_file.read()
-
-        if self._args.model_data_file is not None:
-            self._model_file = ModelFile(self._args.model_data_file)
-            self._model_file.read()
-
-        if self._ross_file is not None and self._model_file is not None and self._event_file is not None:
-            self.state.view_mode = "both"
-            self.state.current_layout = "both"
-        elif self._ross_file is not None and self._model_file is None and self._event_file is None:
-            self.state.view_mode = "engine-only"
-            self.state.current_layout = "sim_engine"
-        elif self._ross_file is None and self._model_file is not None and self._event_file is not None:
-            self.state.view_mode = "model-only"
-            self.state.current_layout = "model"
-
-
-        if self.server.hot_reload:
-            self.server.controller.on_server_reload.add(self._build_ui2)
-        self.ui = self._build_ui2()
-
-        # set state variables
-        self.state.trame__title = "NetMaestro Visualization Dashboard"
-        self.state.setdefault("active_ui", None)
-
-
-
+    # can choose to load any of the data files through the command line
     def _app_settings(self):
         data_kwargs = {
             "help": "Sim Engine data file to load",
@@ -236,13 +132,61 @@ class CodesDashboard:
         return args
 
 
-    @property
-    def ctrl(self):
-        return self.server.controller
-    
-    @property
-    def state(self):
-        return self.server.state
+    def init_all_visualizations(self):
+        empty.init_options(self.server)
+        heatmap.init_options(self.server)
+        network_time.init_options(self.server)
+        parallel_coords.init_options(self.server)
+        scatter_plot.init_options(self.server)
+        time_plot.init_options(self.server)
+
+
+    def set_up_model_vis_view(self):
+        # this also gets added to the state.grid_options, do we need both?
+        self.state[f"model_grid_view_heatmap"] = heatmap.OPTION
+        self.state[f"model_grid_view_network_time_plot"] = network_time.OPTION
+
+        name = 'model_layout'
+        layout = DivLayout(self.server, name,
+                           width='1200px')
+        self.LAYOUTS[name] = layout
+        with layout:
+            with vuetify.VCard(style="height: 100%; width: 100%;",
+                               classes="ma-1 position-absolute top-0 left-0",
+                                #width=1200, height=800
+            ):
+                vuetify.VCardTitle("Model Data Visualizations")
+                vuetify.VDivider()
+                layout.content = vuetify.VCardText()
+                layout.content.vis_views = {}
+                with layout.content:
+                    with vuetify.VRow(v_if="all_model_data_uploaded == false"):
+                        with vuetify.VCol(cols="12"):
+                            html.Div("Load a model data file and event trace file to view visualizations")
+                    self._create_model_vis_view(layout)
+
+
+    def set_up_sim_engine_vis_view(self):
+        self.state[f"engine_grid_view_parallel_coords"] = parallel_coords.OPTION
+        self.state[f"engine_grid_view_scatter_plot"] = scatter_plot.OPTION
+        self.state[f"engine_grid_view_time_plot"] = time_plot.OPTION
+
+        name = 'sim_engine_layout'
+        layout = DivLayout(self.server, name)
+        self.LAYOUTS[name] = layout
+        with layout:
+            with vuetify.VCard(style="height: 100%; width: 100%;",
+                                #width=1200, height=800
+            ):
+                vuetify.VCardTitle("Simulation Engine Visualizations")
+                vuetify.VDivider()
+                layout.content = vuetify.VCardText()
+                layout.content.vis_views = {}
+                with layout.content:
+                    with vuetify.VRow(v_if="sim_engine_data_uploaded == false"):
+                        with vuetify.VCol(cols="12"):
+                            html.Div("Load a simulation engine file to view visualizations")
+                    self._create_sim_engine_vis_view(layout)
 
 
     @change("sim_engine_file")
@@ -259,8 +203,22 @@ class CodesDashboard:
         else:
             self.state.view_mode = "both"
 
-        self._init_sim_engine_plots()
-        self.create_sim_engine_figures()
+        self.state.sim_engine_data_uploaded = True
+
+        parallel_coords.initialize(self.server, self._ross_file)
+        scatter_plot.initialize(self.server, self._ross_file)
+        time_plot.initialize(self.server, self._ross_file)
+
+        # TODO: update the sim engine layout
+        layout = self.LAYOUTS["sim_engine_layout"]
+        with layout:
+            with layout.content:
+                for name, view in layout.content.vis_views.items():
+                    view.clear()
+                    with view:
+                        client.ServerTemplate(name=name)
+
+        self.ctrl.init_parallel_coords()
 
 
     @change("model_data_file")
@@ -281,18 +239,6 @@ class CodesDashboard:
         if self._event_file is not None:
             self.state.all_model_data_uploaded = True
 
-
-        #network_time.initialize(self.server, self._model_file)
-        #view_id = self._available_view_ids.pop(0)
-        #print(f'avail view ids: {self._available_view_ids}')
-        #print(f'network time plot is view_id {view_id}')
-        #self.state.grid_layout.append(
-        #    dict(x=0, y=30, w=8, h=10, i=view_id),
-        #)
-        #self.state[f"grid_view_{view_id}"] = network_time.OPTION
-        #self._build_ui()
-        #self.ui.flush_content()
-
     
     @change("event_data_file")
     def event_data_file_uploaded(self, event_data_file, **kwargs):
@@ -312,19 +258,6 @@ class CodesDashboard:
         if self._model_file is not None:
             self.state.all_model_data_uploaded = True
 
-        #self.state.event_file_uploaded = True
-
-        #heatmap.initialize(self.server, self._event_file)
-        #view_id = self._available_view_ids.pop(0)
-        #print(f'avail view ids: {self._available_view_ids}')
-        #print(f'heatmap plot is view_id {view_id}')
-        #self.state.grid_layout.append(
-        #    dict(x=4, y=10, w=4, h=10, i=view_id),
-        #)
-        #self.state[f"grid_view_{view_id}"] = heatmap.OPTION
-        #self._build_ui()
-        #self.ui.flush_content()
-
 
     @change("all_model_data_uploaded")
     def model_data_uploaded(self, all_model_data_uploaded, **kwargs):
@@ -332,16 +265,16 @@ class CodesDashboard:
             return
         
         heatmap.initialize(self.server, self._event_file)
-        
-        #network_time.initialize(self.server, self._model_file)
+        network_time.initialize(self.server, self._model_file)
 
         # now we can update the model_layout
         layout = self.LAYOUTS["model_layout"]
         with layout:
             with layout.content:
-                layout.content.heatmap_vis.clear()
-                with layout.content.heatmap_vis:
-                    client.ServerTemplate(name="heatmap")
+                for name, view in layout.content.vis_views.items():
+                    view.clear()
+                    with view:
+                        client.ServerTemplate(name=name)
 
 
     @controller.set("view_update")
@@ -349,343 +282,79 @@ class CodesDashboard:
         self.ctrl.on_ross_time_range_changed()
 
 
-    # So vera core must have just had 10 different views that were already created
-    # and you could only readd the ones you deleted. so this will need to be changed
-    # so that you can select what type of view you want to add. will need to have a 
-    # variable that changes so we can access that here, and then we can create the
-    # correct type of view
-    # will also need to have some error checking for if we have any available view ids.
-    # should we limit it to 10 views? 
-    # maybe switch to using a drawer and it will have a list of the views showing,
-    # and that's where you add views
-    # it can kinda be like a pipeline view
-    # that way there can be an assortment of settings for creating the new view, eg
-    # is it model data or sim perf data? do we want to look at a specific type of LP?
-    #@controller.set("grid_add_view")
-    #@change("selected_view")
-    #def add_view(self, selected_view, **kwargs):
-    #    next_view_id = self._available_view_ids.pop()
-    #    # TODO: need to determine how to select the view to be added
-    #    print(f'adding view id {next_view_id} of type {selected_view}')
-    #    print(f'avail view ids: {self._available_view_ids}')
-    #    next_y = get_next_y_from_layout(self.state.grid_layout)
-    #    self.state.grid_layout.append(
-    #        dict(x=0, w=12, h=DEFAULT_NB_ROWS, y=next_y, i=next_view_id)
-    #    ) 
-    #    self.state.dirty("grid_layout")
-
-
-    @controller.set("grid_remove_view")
-    def remove_view(self, view_id):
-        print(f'removing view id {view_id}')
-        self._available_view_ids.append(view_id)
-        print(f'avail view ids: {self._available_view_ids}')
-        # clear out the details of the previous view
-        self.state[f"grid_view_{view_id}"] = empty.OPTION
-        self.state.grid_layout = list(
-            filter(lambda item: item.get("i") != view_id, self.state.grid_layout)
-        )
-
-
-    def actives_change(self, ids):
-        _id = ids[0]
-        if _id == "1":
-            self.state.active_ui = "engine"
-        elif _id == "2":
-            self.state.active_ui = "model"
-        else:
-            self.state.active_ui = "nothing"
-
-
-    def visibility_change(self, event):
-        _id = event["id"]
-        _visibility = event["visible"]
-
-        if _id == "1":
-            # engine
-            pass
-        elif _id == "2":
-            #model
-            pass
-
-
-    def vis_selection(self):
-        trame.GitTree(
-            sources=(
-                "pipeline",
+    def create_vis(self, layout, grid_view_name, template_name, key):
+        with vuetify.VCard(#style="height: 100%;",
+                        key=key,
+                        height=400,
+                        width=600
+        ):
+            with vuetify.VCardTitle(classes="py-1 px-1"):
+                with vuetify.VMenu(offset_y=True):
+                    with vuetify.Template(
+                        v_slot_activator="{ on, attrs }"
+                    ):
+                        with vuetify.VBtn(
+                            icon=True,
+                            small=True,
+                            v_bind="attrs",
+                            v_on="on",
+                        ):
+                            vuetify.VIcon(
+                                v_text=f"get(`{grid_view_name}`).icon"
+                            )
+                        html.Div(
+                            f"{{{{ get(`{grid_view_name}`).label }}}}",
+                            classes="ml-1 text-subtitle-2",
+                        )
+                    with vuetify.VList(dense=True):
+                        with vuetify.VListItem(
+                            v_for="(option, index) in grid_options",
+                            key="index",
+                            click=f"""
+                                set(`{grid_view_name}`, option);
+                                {key}++;
+                            """,
+                        ):
+                            with vuetify.VListItemIcon():
+                                vuetify.VIcon(v_text="option.icon")
+                            vuetify.VListItemTitle("{{ option.label }}")
+            vuetify.VDivider()
+            style = "; ".join(
                 [
-                    {"id": "1", "parent": "0", "visible": 1, "name": "Simulation Engine"},
-                    {"id": "2", "parent": "1", "visible": 1, "name": "Network Model"},
-                ],
-            ),
-            actives_change=(self.actives_change, "[$event]"),
-            visibility_change=(self.visibility_change, "[$event]"),
-        )
-
-
-    def ui_card(self, title, ui_name):
-        with vuetify.VCard(v_show=f"active_ui == '{ui_name}'"):
-            vuetify.VCardTitle(
-                title,
-                classes="grey lighten-1 py-1 grey--text text--darken-3",
-                style="user-select: none; cursor: pointer",
-                hide_details=True,
-                dense=True,
+                    "position: relative",
+                    "height: calc(100% - 37px)",
+                    "overflow: auto",
+                ]
             )
-        content = vuetify.VCardText(classes="py-2")
-        return content
-
-
-    def sim_engine_card(self):
-        with self.ui_card(title="Simulation Engine", ui_name="engine"):
-            vuetify.VFileInput(v_model=("sim_engine_file", None), label="Simulation Engine File")
-
-
-    def model_vis_card(self):
-        with self.ui_card(title="Network Model", ui_name="model"):
-            vuetify.VFileInput(v_model=("model_data_file", None), label="Model Data File")
-            vuetify.VFileInput(v_model=("event_data_file", None), label="Event Data File")
-
-
-    def create_sim_engine_figures(self):
-        if self._ross_file is None:
-            return
-
-        print("CREATING FIGURES")
-        # Parallel Coordinates
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'parallel coords is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=0, y=0, w=8, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = parallel_coords.OPTION
-
-        print("par coords created")
-        # Time plot
-        #TODO: maybe time plot should have to stay, and there can only be 1?
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'time plot is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=0, y=20, w=8, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = time_plot.OPTION
-        print("time plot created")
-
-        # Scatter plot
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'scatter plot is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=0, y=10, w=4, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = scatter_plot.OPTION
-        print("scatter plot created")
-
-
-    def _init_sim_engine_plots(self):
-        if self._ross_file is None:
-            return
-
-        parallel_coords.initialize(self.server, self._ross_file)
-        time_plot.initialize(self.server, self._ross_file)
-        scatter_plot.initialize(self.server, self._ross_file)
-
-
-    def _init_plots(self):
-        empty.initialize(self.server)
-        self._init_sim_engine_plots()
-        if self._model_file is not None:
-            network_time.initialize(self.server, self._model_file)
-        #if self._event_file is not None:
-        #heatmap.initialize(self.server, self._event_file)
-
-
-    def _reserve_views(self):
-        # Reserve the various views
-        self._available_view_ids = [f"{v+1}" for v in range(10)]
-        print(f'created avail view ids: {self._available_view_ids}')
-        for view_id in self._available_view_ids:
-            self.state[f"grid_view_{view_id}"] = empty.OPTION
-
-        #if self._model_file is not None:
-        # network time plot
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'network time plot is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=0, y=30, w=8, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = network_time.OPTION
-
-        #if self._event_file is not None:
-        # heatmap
-        view_id = self._available_view_ids.pop(0)
-        print(f'avail view ids: {self._available_view_ids}')
-        print(f'heatmap plot is view_id {view_id}')
-        self.state.grid_layout.append(
-            dict(x=4, y=10, w=4, h=10, i=view_id),
-        )
-        self.state[f"grid_view_{view_id}"] = heatmap.OPTION
-
-        #self.create_sim_engine_figures()
-
-
-    def _build_ui_init(self, *args, **kwargs):
-        print("begin _build_ui_init")
-        self.state.setdefault("grid_item_dirty_key", 0)
-
-        # Initialize all visualizations
-        self.state.setdefault("grid_layout", [])
-
-        self._init_plots()
-        self._reserve_views()
-
-        print("end _build_ui_init")
-        return self._build_ui()
-        # now maybe with self.ui.content, we can update the content?
+            layout.content.vis_views[template_name] = vuetify.VCardText(style=style, classes="drag_ignore")
+            with layout.content.vis_views[template_name]:
+                client.ServerTemplate(name=f"{template_name}_init")
 
 
     def _create_model_vis_view(self, layout):
-        heatmap.init1(self.server)
-        with vuetify.VRow(v_if="view_mode == 'model-only'", rows=20):
-            with vuetify.VCol(cols="12"):
-                with vuetify.VCard(#style="height: 100%;",
-                                   key="grid_item_dirty_key",
-                                   height=400,
-                                   width=600
-                ):
-                    with vuetify.VCardTitle(classes="py-1 px-1"):
-                        with vuetify.VMenu(offset_y=True):
-                            with vuetify.Template(
-                                v_slot_activator="{ on, attrs }"
-                            ):
-                                with vuetify.VBtn(
-                                    icon=True,
-                                    small=True,
-                                    v_bind="attrs",
-                                    v_on="on",
-                                ):
-                                    vuetify.VIcon(
-                                        v_text="get(`model_grid_view_1`).icon"
-                                    )
-                                html.Div(
-                                    "{{ get(`model_grid_view_1`).label }}",
-                                    classes="ml-1 text-subtitle-2",
-                                )
-                            with vuetify.VList(dense=True):
-                                with vuetify.VListItem(
-                                    v_for="(option, index) in grid_options",
-                                    key="index",
-                                    click="""
-                                        set(`model_grid_view_1`, option);
-                                        grid_item_dirty_key++;
-                                    """,
-                                ):
-                                    with vuetify.VListItemIcon():
-                                        vuetify.VIcon(v_text="option.icon")
-                                    vuetify.VListItemTitle("{{ option.label }}")
-                        #vuetify.VSpacer()
-                        #with vuetify.VBtn(
-                        #    icon=True,
-                        #    x_small=True,
-                        #    click=(self.ctrl.grid_remove_view, "[1]"),
-                        #):
-                        #    vuetify.VIcon(
-                        #        "mdi-delete-forever-outline", small=True
-                        #    )
-                    vuetify.VDivider()
-                    style = "; ".join(
-                        [
-                            "position: relative",
-                            "height: calc(100% - 37px)",
-                            "overflow: auto",
-                        ]
-                    )
-                    layout.content.heatmap_vis = vuetify.VCardText(style=style, classes="drag_ignore")
-                    with layout.content.heatmap_vis:
-                        temp = client.ServerTemplate(name="heatmap_init")
-                        temp.figure
+        with vuetify.VContainer(v_if="all_model_data_uploaded == true"):
+            with vuetify.VRow():
+                with vuetify.VCol(cols="12"):
+                    self.create_vis(layout, "model_grid_view_heatmap", "heatmap", "model_grid_item_dirty_key")
+            with vuetify.VRow():
+                with vuetify.VCol(cols="20"):
+                    self.create_vis(layout, "model_grid_view_network_time_plot", "network_time_plot", "model_grid_item_dirty_key")
+
+        
+    def _create_sim_engine_vis_view(self, layout):
+        with vuetify.VContainer(v_if="sim_engine_data_uploaded == true"):
+            with vuetify.VRow():
+                with vuetify.VCol(cols="12"):
+                    self.create_vis(layout, "engine_grid_view_parallel_coords", "parallel_coords", "engine_grid_item_dirty_key")
+            with vuetify.VRow():
+                with vuetify.VCol(cols="12"):
+                    self.create_vis(layout, "engine_grid_view_scatter_plot", "scatter_plot", "engine_grid_item_dirty_key")
+            with vuetify.VRow():
+                with vuetify.VCol(cols="12"):
+                    self.create_vis(layout, "engine_grid_view_time_plot", "time_plot", "engine_grid_item_dirty_key")
 
 
-    def _create_vis_view(self, layout_name, content):
-        heatmap.init1(self.server)
-        with grid.GridLayout(
-            v_if="view_mode == 'model-only'",
-            layout=("model_layout", []),
-            #layout=(f"{layout_name}", []),
-            row_height=30,
-            vertical_compact=True,
-            style="width: 100%; height: 100%;",
-        ):
-            with grid.GridItem(
-                v_for="item in model_layout",
-                key="item.i",
-                v_bind="item",
-                style="touch-action: none;",
-                drag_ignore_from=".drag_ignore",
-            ):
-                with vuetify.VCard(
-                    style="height: 100%;",
-                    key="grid_item_dirty_key",
-                ):
-                    with vuetify.VCardTitle(classes="py-1 px-1"):
-                        with vuetify.VMenu(offset_y=True):
-                            with vuetify.Template(
-                                v_slot_activator="{ on, attrs }"
-                            ):
-                                with vuetify.VBtn(
-                                    icon=True,
-                                    small=True,
-                                    v_bind="attrs",
-                                    v_on="on",
-                                ):
-                                    vuetify.VIcon(
-                                        v_text="get(`model_grid_view_${item.i}`).icon"
-                                    )
-                                html.Div(
-                                    "{{ get(`model_grid_view_${item.i}`).label }}",
-                                    classes="ml-1 text-subtitle-2",
-                                )
-                            with vuetify.VList(dense=True):
-                                with vuetify.VListItem(
-                                    v_for="(option, index) in grid_options",
-                                    key="index",
-                                    click="""
-                                        set(`model_grid_view_${item.i}`, option);
-                                        grid_item_dirty_key++;
-                                    """,
-                                ):
-                                    with vuetify.VListItemIcon():
-                                        vuetify.VIcon(v_text="option.icon")
-                                    vuetify.VListItemTitle("{{ option.label }}")
-                        vuetify.VSpacer()
-                        with vuetify.VBtn(
-                            icon=True,
-                            x_small=True,
-                            click=(self.ctrl.grid_remove_view, "[item.i]"),
-                        ):
-                            vuetify.VIcon(
-                                "mdi-delete-forever-outline", small=True
-                            )
-                    vuetify.VDivider()
-
-                    style = "; ".join(
-                        [
-                            "position: relative",
-                            "height: calc(100% - 37px)",
-                            "overflow: auto",
-                        ]
-                    )
-                    with vuetify.VCardText(style=style, classes="drag_ignore"):
-                        # Add template for value of get(`grid_view_${item.i}`)
-                        client.ServerTemplate(
-                            name=("get(`model_grid_view_${item.i}`).name",)
-                        )
-
-
-    def _build_ui2(self, *args, **kwargs):
+    def _build_ui(self, *args, **kwargs):
         with RouterViewLayout(self.server, "/"):
             with vuetify.VCard():
                 vuetify.VCardTitle("Getting Started")
@@ -697,20 +366,19 @@ class CodesDashboard:
                 )
 
         with RouterViewLayout(self.server, "/model"):
-            with vuetify.VContainer():
-                client.ServerTemplate(name="model_layout")
+            client.ServerTemplate(name="model_layout")
 
         with RouterViewLayout(self.server, "/engine"):
-            with vuetify.VContainer():
-                client.ServerTemplate(name="sim_engine_layout")
+            client.ServerTemplate(name="sim_engine_layout")
 
         with SinglePageWithDrawerLayout(self.server) as layout:
+            layout.title.set_text("Visualization Dashboard")
             layout.root.classes = ("{ busy: trame__busy }",)
 
             with layout.toolbar as toolbar:
                 toolbar.clear()
 
-                toolbar.height = 36
+                toolbar.height = 50
 
                 vuetify.VSpacer()
 
@@ -729,15 +397,10 @@ class CodesDashboard:
                         width=3,
                     )
 
-                with vuetify.VList(
-                    shaped=True,
-                    v_model=("selectedRoute", 0),
-                    v_model_opened=("open", []),
-                    __properties=[("v_model_opened", "v-model:opened")]
-                ):
-                    with vuetify.VListItem(to="/"):#, prepend_icon="mdi-home", title="Home")
-                        with vuetify.VListItemIcon():
-                            vuetify.VIcon("mdi-home")
+                vuetify.VSpacer()
+
+                with vuetify.VBtn(value="home", to="/"):
+                    vuetify.VIcon("mdi-home")
 
 
             with layout.drawer as drawer:
@@ -757,7 +420,7 @@ class CodesDashboard:
 
             with layout.content:
                 with vuetify.VContainer(
-                    style="user-select: none;",
+                    style="user-select: none; width=100%;",
                 ):
                     router.RouterView()
 
@@ -765,12 +428,13 @@ class CodesDashboard:
 
 
 
-    def _build_ui(self, *args, **kwargs):
-        print("begin _build_ui")
-        # so i think this should be pretty basic and just have the layout stuff
-        # other things should be moved so we can load with an inital set of vis (depending
-        # on what is preloaded), then we can update as files get loaded
-
+# this was the original way of doing things, taken from VeraCore, but i couldn't get it
+# to work correctly when uploading files (as opposed to providing files via the command line).
+# I ended up not using the grid layout, but it's very clunky so I'm leaving this code here
+# for now in case I want to go back to it.
+# other methods after this are related to how it was done before, but not using them
+# in the new way of setting things up
+    def _build_ui_old(self, *args, **kwargs):
         _available_view_types = ["scatter_plot", "parallel_coordinates"]
 
         # Setup main layout
@@ -781,7 +445,7 @@ class CodesDashboard:
             with layout.toolbar as toolbar:
                 toolbar.clear()
 
-                toolbar.height = 36
+                toolbar.height = 40
 
                 vuetify.VSpacer()
 
@@ -942,3 +606,109 @@ class CodesDashboard:
                                         name=("get(`grid_view_${item.i}`).name",)
                                     )
             return layout
+
+
+    def __init_old(self, server_or_name=None) -> None:
+
+        self.state.setdefault("grid_layout", [])
+
+        self.state.sim_engine_layout = [
+                {"x:": 0, "y": 0, "w": 8, "h": 10, "i": "0"},
+                {"x:": 0, "y": 20, "w": 8, "h": 10, "i": "1"},
+                {"x:": 0, "y": 10, "w": 4, "h": 10, "i": "2"},
+        ]
+        self.state.model_layout = [
+                #{"x:": 0, "y": 30, "w": 8, "h": 10, "i": 1},
+            dict(x=4, y=10, w=4, h=10, i=1),
+                #{"x:": 4, "y": 10, "w": 4, "h": 10, "i": 1},
+        ]
+
+        self.state.current_layout = "none"
+
+        # can be none, model-only, engine-only, both
+        self.state.view_mode = "none"
+
+        if self._ross_file is not None and self._model_file is not None and self._event_file is not None:
+            self.state.view_mode = "both"
+            self.state.current_layout = "both"
+        elif self._ross_file is not None and self._model_file is None and self._event_file is None:
+            self.state.view_mode = "engine-only"
+            self.state.current_layout = "sim_engine"
+        elif self._ross_file is None and self._model_file is not None and self._event_file is not None:
+            self.state.view_mode = "model-only"
+            self.state.current_layout = "model"
+
+
+        self.state.setdefault("active_ui", None)
+
+
+    @controller.set("grid_remove_view")
+    def remove_view(self, view_id):
+        print(f'removing view id {view_id}')
+        self._available_view_ids.append(view_id)
+        print(f'avail view ids: {self._available_view_ids}')
+        # clear out the details of the previous view
+        self.state[f"grid_view_{view_id}"] = empty.OPTION
+        self.state.grid_layout = list(
+            filter(lambda item: item.get("i") != view_id, self.state.grid_layout)
+        )
+
+
+    def actives_change(self, ids):
+        _id = ids[0]
+        if _id == "1":
+            self.state.active_ui = "engine"
+        elif _id == "2":
+            self.state.active_ui = "model"
+        else:
+            self.state.active_ui = "nothing"
+
+
+    def visibility_change(self, event):
+        _id = event["id"]
+        _visibility = event["visible"]
+
+        if _id == "1":
+            # engine
+            pass
+        elif _id == "2":
+            #model
+            pass
+
+
+    def vis_selection(self):
+        trame.GitTree(
+            sources=(
+                "pipeline",
+                [
+                    {"id": "1", "parent": "0", "visible": 1, "name": "Simulation Engine"},
+                    {"id": "2", "parent": "1", "visible": 1, "name": "Network Model"},
+                ],
+            ),
+            actives_change=(self.actives_change, "[$event]"),
+            visibility_change=(self.visibility_change, "[$event]"),
+        )
+
+
+    def ui_card(self, title, ui_name):
+        with vuetify.VCard(v_show=f"active_ui == '{ui_name}'"):
+            vuetify.VCardTitle(
+                title,
+                classes="grey lighten-1 py-1 grey--text text--darken-3",
+                style="user-select: none; cursor: pointer",
+                hide_details=True,
+                dense=True,
+            )
+        content = vuetify.VCardText(classes="py-2")
+        return content
+
+
+    def sim_engine_card(self):
+        with self.ui_card(title="Simulation Engine", ui_name="engine"):
+            vuetify.VFileInput(v_model=("sim_engine_file", None), label="Simulation Engine File")
+
+
+    def model_vis_card(self):
+        with self.ui_card(title="Network Model", ui_name="model"):
+            vuetify.VFileInput(v_model=("model_data_file", None), label="Model Data File")
+            vuetify.VFileInput(v_model=("event_data_file", None), label="Event Data File")

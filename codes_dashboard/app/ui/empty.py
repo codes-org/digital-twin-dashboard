@@ -8,16 +8,17 @@ OPTION = {
 }
 
 
-def initialize(server):
+def init_options(server):
     state = server.state
 
     if OPTION not in state.grid_options:
         state.grid_options.append(OPTION)
 
-    with DivLayout(server, template_name="empty") as layout:
-        layout.root.add_child("Some empty content...")
-    
-def create_empty_vis(server, template_name):
+
+# Created this because it seems that I need to create some kind of initial
+# plotly figure, so that way once data does get loaded, the figure will show up
+# without doing this, the figure will never show up
+def init_empty_vis(server, template_name):
     state, ctrl = server.state, server.controller
 
     with DivLayout(server, template_name=f'{template_name}_init') as layout:
@@ -35,6 +36,3 @@ def create_empty_vis(server, template_name):
             display_mode_bar=False,
             style=style,
         )
-
-        layout.options = vuetify.VRow(classes="pt-2", dense=True)
-        
