@@ -39,6 +39,10 @@ def initialize(server, network_file):
             return None
         df = network_file.network_df
         matrix = df.groupby(['source_lp', 'dest_lp']).size().unstack(fill_value=0)
+        #for index in matrix.index:
+        #    if index in matrix.columns:
+        #        matrix.at[index, index] = 0
+
         print(matrix)
 
         # TODO: make it so you can get the number of bytes sent

@@ -94,8 +94,10 @@ class EventFile:
     @property
     def network_df(self):
         return self._simplep2p_df[
-            (self._simplep2p_df[self._time_variable] >= self._min_time) & 
-            (self._simplep2p_df[self._time_variable] <= self._max_time)]
+                    (self._simplep2p_df[self._time_variable] >= self._min_time) & 
+                    (self._simplep2p_df[self._time_variable] <= self._max_time)] #&
+                    #(self._simplep2p_df['source_lp'].isin([1, 2, 4, 6, 8])) &
+                    #(self._simplep2p_df['dest_lp'].isin([1, 2, 4, 6, 8]))]
 
 
     def reset_time_range(self):

@@ -38,13 +38,6 @@ def initialize(server, ross_file):
         figure.update_layout(margin=dict(t=40, b=20, l=25, r=20))
         return figure
 
-    #TODO: not sure how to get rid of selected_array fully without it messing up the figure. 
-    # I think because it needs some kind of event to trigger this.
-    # But I think I will add some other options to the toolbar in the future that
-    # could trigger a state change so just leaving for now
-    #@state.change(
-    #    "selected_array",
-    #)
     @ctrl.add("init_parallel_coords")
     def on_cell_change():
         print("on_cell_change called")
